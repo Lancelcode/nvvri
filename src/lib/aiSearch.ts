@@ -1,12 +1,15 @@
 import type { AIFilters } from "@/types";
+import { nurseries } from "@/lib/data";
 
-const AREA_MAP: Record<string, string> = {
-  morningside: "Morningside",
-  leith: "Leith",
-  bruntsfield: "Bruntsfield",
-  newington: "Newington",
-  stockbridge: "Stockbridge",
-  corstorphine: "Corstorphine",
+const AREAS = ["Morningside", "Leith", "Bruntsfield", "Newington", "Stockbridge", "Corstorphine"] as const;
+
+// EH10 is ambiguous (covers Morningside + Bruntsfield) so excluded from prefix map
+// Full postcode lookup handles EH10 correctly via nursery data
+const DISTRICT_MAP: Record<string, string> = {
+  "eh6":  "Leith",
+  "eh9":  "Newington",
+  "eh3":  "Stockbridge",
+  "eh12": "Corstorphine",
 };
 
 export const THINKING_STEPS = [
@@ -14,67 +17,115 @@ export const THINKING_STEPS = [
   "Identifying what you need...",
   "Matching nurseries...",
   "Almost there...",
-];
+] as const;
 
-export function parseQuery(query: string): AIFilters {
-  const q = query.toLowerCase();
+// ─── Resolvers ────────────────────────────────────────────────────────────────
 
-  // Area
-  const areaKey = Object.keys(AREA_MAP).find((a) => q.includes(a)) ?? null;
-  const area = areaKey ? AREA_MAP[areaKey] : null;
+function resolveArea(q: string): string | null {
+  // 1. Named area
+  const byName = AREAS.find((a) => q.includes(a.toLowerCase()));
+  if (byName) return byName;
 
-  // Ofsted
-  let ofsted: AIFilters["ofsted"] = null;
-  if (q.includes("outstanding")) ofsted = "Outstanding";
-  else if (q.includes("requires improvement")) ofsted = "Requires Improvement";
-  else if (q.includes("good")) ofsted = "Good";
-
-  // Age
-  let minAge: number | null = null;
-  let maxAge: number | null = null;
-  if (q.includes("baby") || q.includes("babies") || q.includes("infant") || q.includes("under 1") || q.includes("newborn")) {
-    minAge = 0; maxAge = 1;
-  } else if (q.includes("toddler")) {
-    minAge = 1; maxAge = 3;
-  } else if (q.includes("preschool") || q.includes("pre-school") || q.match(/[345]\s*year/)) {
-    minAge = 3; maxAge = 5;
+  // 2. Full postcode — match directly against nursery data (handles EH10 4HR vs EH10 4BX)
+  const fullPostcode = q.match(/\beh\d+\s+\d[a-z]{2}\b/)?.[0]
+    ?.toUpperCase()
+    .replace(/\s+/, " ");
+  if (fullPostcode) {
+    const match = nurseries.find((n) => n.postcode === fullPostcode);
+    if (match) return match.area;
   }
 
-  // Price
-  let maxPrice: number | null = null;
-  const priceMatch = q.match(/(?:under|less than|max|below)\s*£?(\d+)|£?(\d+)\s*(?:a day|per day|\/day)/);
-  if (priceMatch) maxPrice = Number(priceMatch[1] ?? priceMatch[2]);
-  else if (q.includes("cheap") || q.includes("affordable") || q.includes("budget")) maxPrice = 52;
+  // 3. District prefix (EH6, EH9, EH3, EH12)
+  const district = q.match(/\beh\d+\b/)?.[0]?.toLowerCase();
+  if (district) return DISTRICT_MAP[district] ?? null;
 
-  // Availability
-  let availFilter: AIFilters["availFilter"] = "any";
-  if (q.includes("available") || q.includes("spaces") || q.includes("immediate")) availFilter = "available";
-  else if (q.includes("waitlist") || q.includes("waiting list")) availFilter = "waitlist";
+  return null;
+}
 
-  // Tags
+function resolveAge(q: string): { minAge: number | null; maxAge: number | null } {
+  if (/\b(baby|babies|infant|newborn|under[\s-]?1)\b/.test(q)) {
+    return { minAge: 0, maxAge: 0.9 };
+  }
+  if (/\btoddler/.test(q)) {
+    return { minAge: 1, maxAge: 2.9 };
+  }
+  if (/\b(preschool|pre-school|[345][\s-]?year)/.test(q)) {
+    return { minAge: 3, maxAge: 5 };
+  }
+  // "X months old" e.g. "my son is 8 months old"
+  const months = q.match(/(\d+)\s*months?\s*old/);
+  if (months) {
+    const ageYears = Number(months[1]) / 12;
+    return { minAge: 0, maxAge: ageYears + 0.25 };
+  }
+  return { minAge: null, maxAge: null };
+}
+
+function resolvePrice(q: string): number | null {
+  const explicit = q.match(
+    /(?:under|less\s+than|max|below|up\s+to)\s*£?(\d+)|£?(\d+)\s*(?:a\s+day|per\s+day|\/day)/
+  );
+  if (explicit) return Number(explicit[1] ?? explicit[2]);
+  if (/\b(cheap|affordable|budget)\b/.test(q)) return 52;
+  return null;
+}
+
+function resolveAvailability(q: string): AIFilters["availFilter"] {
+  if (/\b(available|spaces?\s+available|immediate|right\s+now)\b/.test(q)) return "available";
+  if (/\b(waitlist|waiting\s+list)\b/.test(q)) return "waitlist";
+  return "any";
+}
+
+function resolveTags(q: string): string[] {
   const tags: string[] = [];
-  if (q.includes("outdoor") || q.includes("forest school")) tags.push("Outdoor Learning");
-  if (q.includes("nature")) tags.push("Nature Play");
-  if (q.includes("garden")) tags.push("Garden");
-  if (q.includes("bilingual") || q.includes("french")) tags.push("Bilingual");
-  if (q.includes("stem") || q.includes("science")) tags.push("STEM Focus");
-  if (q.includes("arts") || q.includes("craft") || q.includes("creative")) tags.push("Arts & Crafts");
-  if (q.includes("funded") || q.includes("free hours")) tags.push("Funded Places");
-  if (q.includes("flexible")) tags.push("Flexible Hours");
-  if (q.includes("yoga")) tags.push("Yoga");
-  if (q.includes("large") || q.includes("big setting")) tags.push("Large Setting");
+  if (/\b(outdoor|forest\s+school)\b/.test(q))  tags.push("Outdoor Learning");
+  if (/\bnature\b/.test(q))                       tags.push("Nature Play");
+  if (/\bgarden\b/.test(q))                       tags.push("Garden");
+  if (/\b(bilingual|french)\b/.test(q))           tags.push("Bilingual");
+  if (/\b(stem|science|technology)\b/.test(q))    tags.push("STEM Focus");
+  if (/\b(arts?|craft|creative)\b/.test(q))       tags.push("Arts & Crafts");
+  if (/\b(funded|free\s+hours?)\b/.test(q))       tags.push("Funded Places");
+  if (/\bflexible\b/.test(q))                     tags.push("Flexible Hours");
+  if (/\byoga\b/.test(q))                         tags.push("Yoga");
+  if (/\b(large|big)\s+setting\b/.test(q))        tags.push("Large Setting");
+  return tags;
+}
 
-  // Human-readable explanation
+function resolveOfsted(q: string): AIFilters["ofsted"] {
+  if (/\boutstanding\b/.test(q))        return "Outstanding";
+  if (/requires\s+improvement/.test(q)) return "Requires Improvement";
+  if (/\bgood\b/.test(q))               return "Good";
+  return null;
+}
+
+function buildExplanation(f: Omit<AIFilters, "explanation">): string {
   const parts: string[] = [];
-  if (ofsted) parts.push(ofsted);
+  if (f.ofsted) parts.push(f.ofsted);
   parts.push("nurseries");
-  if (area) parts.push(`in ${area}`);
-  if (maxAge != null && maxAge <= 1) parts.push("for babies");
-  else if (minAge != null && minAge >= 1 && maxAge != null && maxAge <= 3) parts.push("for toddlers");
-  else if (minAge != null && minAge >= 3) parts.push("for preschoolers");
-  if (maxPrice) parts.push(`under £${maxPrice}/day`);
-  if (availFilter === "available") parts.push("with spaces available");
-  if (tags.length > 0) parts.push(`with ${tags.join(" & ").toLowerCase()}`);
+  if (f.area) parts.push(`in ${f.area}`);
+  if (f.maxAge !== null && f.maxAge < 1)                                      parts.push("for babies");
+  else if (f.minAge !== null && f.minAge >= 1 && f.maxAge !== null && f.maxAge < 3) parts.push("for toddlers");
+  else if (f.minAge !== null && f.minAge >= 3)                                parts.push("for preschoolers");
+  if (f.maxPrice)                       parts.push(`under £${f.maxPrice}/day`);
+  if (f.availFilter === "available")    parts.push("with spaces available");
+  if (f.availFilter === "waitlist")     parts.push("on waitlist only");
+  if (f.tags.length > 0)               parts.push(`with ${f.tags.join(" & ").toLowerCase()}`);
+  return parts.join(" ");
+}
 
-  return { area, minAge, maxAge, ofsted, maxPrice, availFilter, tags, explanation: parts.join(" ") };
+// ─── Main export ──────────────────────────────────────────────────────────────
+
+export function parseQuery(query: string): AIFilters {
+  const q = query.toLowerCase().trim();
+
+  const filters = {
+    area:        resolveArea(q),
+    ofsted:      resolveOfsted(q),
+    maxPrice:    resolvePrice(q),
+    availFilter: resolveAvailability(q),
+    tags:        resolveTags(q),
+    ...resolveAge(q),
+  };
+
+  return { ...filters, explanation: buildExplanation(filters) };
 }
