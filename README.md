@@ -4,7 +4,7 @@ A nursery discovery platform built to understand the problem of connecting paren
 
 Finding a nursery in the UK is surprisingly broken. Parents search across five different sites, call nurseries individually, and still can't easily compare Ofsted ratings, fees, and availability in one place. nvvri is a proof of concept for what that experience should look like.
 
-**Live demo:** [nvvri.vercel.app](https://nvvri.vercel.app)
+**Live demo:** [nvvri.vercel.app](https://nvvrii.vercel.app)
 
 ---
 
