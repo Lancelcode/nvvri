@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Nvvrii! — Find the right nursery",
-  description: "Search, compare, and enquire at nurseries near you. Built as a proof of concept.",
+  title: "nvvri | Find the right nursery",
+  description: "Search and compare nurseries near you — filter by age, price, Ofsted rating and availability.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
