@@ -1,4 +1,4 @@
-import type { Nursery } from "@/types";
+import type { Nursery, AIFilters, SortOption } from "@/types";
 
 export const nurseries: Nursery[] = [
   {
@@ -139,5 +139,31 @@ export function filterNurseries(
       (availFilter === "waitlist" && n.spaces === 0);
 
     return matchSearch && matchPrice && matchAge && matchAvail;
+  });
+}
+
+export function filterByAI(data: Nursery[], f: AIFilters): Nursery[] {
+  return data.filter((n) => {
+    if (f.area && !n.area.toLowerCase().includes(f.area.toLowerCase())) return false;
+    if (f.ofsted && n.ofsted !== f.ofsted) return false;
+    if (f.maxPrice != null && n.price > f.maxPrice) return false;
+    if (f.minAge != null && n.maxAge < f.minAge) return false;
+    if (f.maxAge != null && n.minAge > f.maxAge) return false;
+    if (f.availFilter === "available" && n.spaces === 0) return false;
+    if (f.availFilter === "waitlist" && n.spaces > 0) return false;
+    if (f.tags.length > 0 && !f.tags.some((t) => n.tags.includes(t))) return false;
+    return true;
+  });
+}
+
+export function sortNurseries(data: Nursery[], sort: SortOption): Nursery[] {
+  return [...data].sort((a, b) => {
+    switch (sort) {
+      case "rating":     return b.rating - a.rating;
+      case "price-asc":  return a.price - b.price;
+      case "price-desc": return b.price - a.price;
+      case "spaces":     return b.spaces - a.spaces;
+      default:           return 0;
+    }
   });
 }

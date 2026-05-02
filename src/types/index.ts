@@ -29,23 +29,13 @@ export interface EnquiryForm {
 
 export type AgeFilter = "any" | "baby" | "toddler" | "preschool";
 export type AvailFilter = "any" | "available" | "waitlist";
-
-export interface AIFilters {
-  area: string | null;
-  maxAge: number | null;
-  minAge: number | null;
-  ofsted: "Outstanding" | "Good" | "Requires Improvement" | null;
-  maxPrice: number | null;
-  availFilter: "available" | "waitlist" | "any";
-  tags: string[];
-  explanation: string;
-}
+export type SortOption = "rating" | "price-asc" | "price-desc" | "spaces";
 
 export interface AIFilters {
   area: string | null;
   minAge: number | null;
   maxAge: number | null;
-  ofsted: "Outstanding" | "Good" | "Requires Improvement" | null;
+  ofsted: OfstedRating | null;
   maxPrice: number | null;
   availFilter: "available" | "waitlist" | "any";
   tags: string[];
