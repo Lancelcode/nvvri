@@ -1,6 +1,6 @@
 # nvvri
 
-A nursery discovery platform built to understand the problem of connecting parents with childcare — the same problem the best nursery-tech companies are solving right now.
+A nursery discovery platform built to understand the problem of connecting parents with childcare, the same problem the best nursery-tech companies are solving right now.
 
 Finding a nursery in the UK is surprisingly broken. Parents search across five different sites, call nurseries individually, and still can't easily compare Ofsted ratings, fees, and availability in one place. nvvri is a proof of concept for what that experience should look like.
 
@@ -10,7 +10,7 @@ Finding a nursery in the UK is surprisingly broken. Parents search across five d
 
 ## AI-powered natural language search
 
-The most interesting feature isn't the filters — it's the search bar at the top.
+The most interesting feature isn't the filters, it's the search bar at the top.
 
 Instead of dropdowns, parents can type what they actually mean:
 
@@ -18,30 +18,30 @@ Instead of dropdowns, parents can type what they actually mean:
 > *"Affordable toddler nursery in Stockbridge with spaces available"*
 > *"EH10 4HR"*
 
-The parser resolves intent — area (by name or postcode), age group, Ofsted rating, price range, availability, and specialist tags — and filters results in real time with a thinking animation that mirrors what a real LLM call would feel like.
+The parser resolves intent, area (by name or postcode), age group, Ofsted rating, price range, availability, and specialist tags — and filters results in real time with a thinking animation that mirrors what a real LLM call would feel like.
 
-The architecture is deliberate: the client-side parser (`src/lib/aiSearch.ts`) handles intent resolution without exposing API keys in a public repo. The API route (`src/app/api/search/route.ts`) is already written for a real Claude or Gemini call — swapping in a key is a one-line change.
+The architecture is deliberate: the client-side parser (`src/lib/aiSearch.ts`) handles intent resolution without exposing API keys in a public repo. The API route (`src/app/api/search/route.ts`) is already written for a real Claude or Gemini call, swapping in a key is a one-line change.
 
 ---
 
 ## Stack
 
-- **Next.js 15** — App Router, Turbopack dev server
-- **TypeScript** — strict mode throughout, no `any`
-- **React 19** — client-side state and interactivity
-- **No Tailwind** — inline styles only, intentional constraint
+- **Next.js 15** App Router, Turbopack dev server
+- **TypeScript** strict mode throughout, no `any`
+- **React 19** client-side state and interactivity
+- **No Tailwind** inline styles only, intentional constraint
 
 ---
 
 ## Features
 
-- **AI natural language search** — intent parser resolves area, age, Ofsted, price, tags, and availability from free text
-- **Postcode support** — full postcodes (`EH10 4HR`) resolve to the correct area via nursery data, not a hardcoded map
-- **Manual filters** — price slider, age group, and availability as fallback
-- **Sort** — by rating, price (low/high), or spaces available
-- **Nursery cards** — Ofsted badge (Outstanding / Good / Requires Improvement with correct colour coding), fees, hours, age range, tags
-- **Two-step enquiry flow** — with field validation, inline error states, and ESC-to-close
-- **Thinking animation** — cycling messages that simulate AI processing latency
+- **AI natural language search** intent parser resolves area, age, Ofsted, price, tags, and availability from free text
+- **Postcode support** full postcodes (`EH10 4HR`) resolve to the correct area via nursery data, not a hardcoded map
+- **Manual filters** price slider, age group, and availability as fallback
+- **Sort** by rating, price (low/high), or spaces available
+- **Nursery cards** Ofsted badge (Outstanding / Good / Requires Improvement with correct colour coding), fees, hours, age range, tags
+- **Two-step enquiry flow** with field validation, inline error states, and ESC-to-close
+- **Thinking animation** cycling messages that simulate AI processing latency
 
 ---
 
