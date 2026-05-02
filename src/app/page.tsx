@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { NurseryCard } from "@/components/NurseryCard";
 import { EnquiryModal } from "@/components/EnquiryModal";
 import { nurseries, filterNurseries } from "@/lib/data";
+import { parseQuery, THINKING_STEPS } from "@/lib/aiSearch";
 import type { Nursery, AgeFilter, AvailFilter, AIFilters } from "@/types";
 
 function filterByAI(data: Nursery[], f: AIFilters): Nursery[] {
@@ -20,6 +21,50 @@ function filterByAI(data: Nursery[], f: AIFilters): Nursery[] {
   });
 }
 
+function ThinkingIndicator() {
+  const [step, setStep] = useState(0);
+  const [visible, setVisible] = useState(true);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setVisible(false);
+      setTimeout(() => {
+        setStep((s) => (s + 1) % THINKING_STEPS.length);
+        setVisible(true);
+      }, 200);
+    }, 600);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: 12,
+      padding: "20px 0", justifyContent: "center",
+    }}>
+      <div style={{ display: "flex", gap: 5 }}>
+        {[0, 1, 2].map((i) => (
+          <div key={i} style={{
+            width: 7, height: 7, borderRadius: "50%", background: "#1a7a4a",
+            animation: `bounce 1.2s ease-in-out ${i * 0.2}s infinite`,
+          }} />
+        ))}
+      </div>
+      <span style={{
+        fontSize: 14, color: "#15803d", fontWeight: 500,
+        opacity: visible ? 1 : 0, transition: "opacity 0.2s ease",
+      }}>
+        {THINKING_STEPS[step]}
+      </span>
+      <style>{`
+        @keyframes bounce {
+          0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+          40% { transform: translateY(-6px); opacity: 1; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 export default function HomePage() {
   const [search, setSearch] = useState("");
   const [maxPrice, setMaxPrice] = useState(70);
@@ -29,39 +74,31 @@ export default function HomePage() {
 
   const [aiQuery, setAiQuery] = useState("");
   const [aiFilters, setAiFilters] = useState<AIFilters | null>(null);
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiThinking, setAiThinking] = useState(false);
+
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const filtered = aiFilters
     ? filterByAI(nurseries, aiFilters)
     : filterNurseries(nurseries, search, maxPrice, ageFilter, availFilter);
 
-  async function handleAISearch() {
+  function handleAISearch() {
     if (!aiQuery.trim()) return;
-    setAiLoading(true);
-    setAiError(null);
+    setAiThinking(true);
     setAiFilters(null);
 
-    try {
-      const res = await fetch("/api/search", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: aiQuery }),
-      });
-      if (!res.ok) throw new Error("Search failed");
-      const data: AIFilters = await res.json();
-      setAiFilters(data);
-    } catch {
-      setAiError("AI search failed — try again or use the filters below.");
-    } finally {
-      setAiLoading(false);
-    }
+    // Fake thinking delay — real API call would go here
+    setTimeout(() => {
+      setAiFilters(parseQuery(aiQuery));
+      setAiThinking(false);
+    }, 1800);
   }
 
   function clearAISearch() {
     setAiFilters(null);
     setAiQuery("");
-    setAiError(null);
+    setAiThinking(false);
+    inputRef.current?.focus();
   }
 
   return (
@@ -108,57 +145,50 @@ export default function HomePage() {
             Search, compare, and enquire — all in one place.
           </p>
 
-          {/* AI Search Bar */}
+          {/* AI Search */}
           <div style={{
-            background: "linear-gradient(135deg, #f0fdf4 0%, #eff6ff 100%)",
-            border: "1.5px solid #bbf7d0",
-            borderRadius: 14,
-            padding: "16px 20px",
-            marginBottom: 16,
+            background: "#f0fdf4", border: "1.5px solid #bbf7d0",
+            borderRadius: 14, padding: "16px 20px", marginBottom: 16,
           }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-              <span style={{ fontSize: 16 }}>✨</span>
-              <span style={{ fontSize: 13, fontWeight: 600, color: "#15803d" }}>AI Search</span>
-              <span style={{ fontSize: 12, color: "#64748b" }}>— describe what you're looking for</span>
+              <span style={{ fontSize: 14, fontWeight: 600, color: "#15803d" }}>✦ AI Search</span>
+              <span style={{ fontSize: 12, color: "#64748b" }}>describe what you're looking for</span>
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <input
+                ref={inputRef}
                 value={aiQuery}
                 onChange={(e) => setAiQuery(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleAISearch()}
-                placeholder="e.g. Outstanding nursery in Leith for a baby under 1 with outdoor space"
+                disabled={aiThinking}
+                placeholder='e.g. "Outstanding nursery in Leith for a baby with outdoor space"'
                 style={{
                   flex: 1, padding: "10px 14px", borderRadius: 8,
                   border: "1px solid #d1fae5", fontSize: 14,
-                  background: "white", outline: "none",
-                  color: "#0f172a",
+                  background: "white", outline: "none", color: "#0f172a",
                 }}
               />
               <button
                 onClick={handleAISearch}
-                disabled={aiLoading || !aiQuery.trim()}
+                disabled={aiThinking || !aiQuery.trim()}
                 style={{
-                  background: aiLoading ? "#86efac" : "#1a7a4a",
+                  background: aiThinking ? "#86efac" : "#1a7a4a",
                   color: "white", border: "none", borderRadius: 8,
-                  padding: "10px 18px", fontSize: 14, fontWeight: 600,
-                  cursor: aiLoading ? "default" : "pointer",
-                  whiteSpace: "nowrap", transition: "background 0.2s",
+                  padding: "10px 20px", fontSize: 14, fontWeight: 600,
+                  cursor: aiThinking ? "default" : "pointer",
+                  whiteSpace: "nowrap", transition: "background 0.15s",
                 }}
               >
-                {aiLoading ? "Searching..." : "Search"}
+                {aiThinking ? "Thinking..." : "Search"}
               </button>
             </div>
-            {aiError && (
-              <p style={{ fontSize: 13, color: "#dc2626", marginTop: 8, textAlign: "left" }}>{aiError}</p>
-            )}
           </div>
 
           {/* Standard search */}
           <div style={{ position: "relative" }}>
             <svg style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)" }}
               width={16} height={16} fill="none" stroke="#94a3b8" strokeWidth={2} viewBox="0 0 24 24">
-              <circle cx={11} cy={11} r={8} />
-              <path d="m21 21-4.35-4.35" />
+              <circle cx={11} cy={11} r={8} /><path d="m21 21-4.35-4.35" />
             </svg>
             <input
               value={search}
@@ -174,70 +204,58 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Filters + Results */}
+      {/* Results */}
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: "24px 24px" }}>
 
-        {/* AI result explanation */}
-        {aiFilters && (
+        {/* Thinking animation */}
+        {aiThinking && <ThinkingIndicator />}
+
+        {/* AI result pill */}
+        {aiFilters && !aiThinking && (
           <div style={{
             background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10,
-            padding: "12px 16px", marginBottom: 20,
+            padding: "11px 16px", marginBottom: 20,
             display: "flex", alignItems: "center", justifyContent: "space-between",
           }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 15 }}>✨</span>
+              <span style={{ fontSize: 13 }}>✦</span>
               <span style={{ fontSize: 14, color: "#15803d", fontWeight: 500 }}>
                 {aiFilters.explanation}
               </span>
-              <span style={{ fontSize: 13, color: "#64748b" }}>
-                — {filtered.length} result{filtered.length !== 1 ? "s" : ""}
+              <span style={{ fontSize: 13, color: "#94a3b8" }}>
+                · {filtered.length} result{filtered.length !== 1 ? "s" : ""}
               </span>
             </div>
-            <button
-              onClick={clearAISearch}
-              style={{
-                background: "none", border: "1px solid #86efac", borderRadius: 6,
-                padding: "4px 10px", fontSize: 12, color: "#15803d",
-                cursor: "pointer", fontWeight: 500,
-              }}
-            >
+            <button onClick={clearAISearch} style={{
+              background: "none", border: "1px solid #86efac", borderRadius: 6,
+              padding: "4px 10px", fontSize: 12, color: "#15803d",
+              cursor: "pointer", fontWeight: 500,
+            }}>
               Clear
             </button>
           </div>
         )}
 
-        {/* Manual filters — hidden when AI search is active */}
-        {!aiFilters && (
-          <div style={{
-            display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 24,
-            alignItems: "center",
-          }}>
+        {/* Manual filters */}
+        {!aiFilters && !aiThinking && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 24, alignItems: "center" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <label style={{ fontSize: 13, color: "#64748b", whiteSpace: "nowrap" }}>
                 Max price: <strong style={{ color: "#0f172a" }}>£{maxPrice}/day</strong>
               </label>
               <input type="range" min={40} max={70} value={maxPrice}
                 onChange={(e) => setMaxPrice(Number(e.target.value))}
-                style={{ width: 100, accentColor: "#1a7a4a" }}
-              />
+                style={{ width: 100, accentColor: "#1a7a4a" }} />
             </div>
-            <select value={ageFilter}
-              onChange={(e) => setAgeFilter(e.target.value as AgeFilter)}
-              style={{
-                padding: "7px 12px", borderRadius: 8, border: "1.5px solid #e2e8f0",
-                fontSize: 13, background: "white", cursor: "pointer", color: "#0f172a",
-              }}>
+            <select value={ageFilter} onChange={(e) => setAgeFilter(e.target.value as AgeFilter)}
+              style={{ padding: "7px 12px", borderRadius: 8, border: "1.5px solid #e2e8f0", fontSize: 13, background: "white", cursor: "pointer", color: "#0f172a" }}>
               <option value="any">Any age</option>
               <option value="baby">Baby (0–12m)</option>
               <option value="toddler">Toddler (1–2y)</option>
               <option value="preschool">Preschool (3–5y)</option>
             </select>
-            <select value={availFilter}
-              onChange={(e) => setAvailFilter(e.target.value as AvailFilter)}
-              style={{
-                padding: "7px 12px", borderRadius: 8, border: "1.5px solid #e2e8f0",
-                fontSize: 13, background: "white", cursor: "pointer", color: "#0f172a",
-              }}>
+            <select value={availFilter} onChange={(e) => setAvailFilter(e.target.value as AvailFilter)}
+              style={{ padding: "7px 12px", borderRadius: 8, border: "1.5px solid #e2e8f0", fontSize: 13, background: "white", cursor: "pointer", color: "#0f172a" }}>
               <option value="any">Any availability</option>
               <option value="available">Spaces available</option>
               <option value="waitlist">Waitlist only</option>
@@ -248,29 +266,27 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* Results grid */}
-        {filtered.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "60px 0", color: "#94a3b8" }}>
-            <p style={{ fontSize: 16, marginBottom: 8 }}>No nurseries match your search.</p>
-            {aiFilters && (
-              <button onClick={clearAISearch} style={{
-                background: "none", border: "none", color: "#1a7a4a",
-                fontSize: 14, cursor: "pointer", textDecoration: "underline",
-              }}>
-                Clear AI search and browse all
-              </button>
-            )}
-          </div>
-        ) : (
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
-            gap: 20,
-          }}>
-            {filtered.map((n) => (
-              <NurseryCard key={n.id} nursery={n} onEnquire={() => setSelected(n)} />
-            ))}
-          </div>
+        {/* Grid */}
+        {!aiThinking && (
+          filtered.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "60px 0", color: "#94a3b8" }}>
+              <p style={{ fontSize: 16, marginBottom: 8 }}>No nurseries match your search.</p>
+              {aiFilters && (
+                <button onClick={clearAISearch} style={{
+                  background: "none", border: "none", color: "#1a7a4a",
+                  fontSize: 14, cursor: "pointer", textDecoration: "underline",
+                }}>
+                  Clear and browse all
+                </button>
+              )}
+            </div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 20 }}>
+              {filtered.map((n) => (
+                <NurseryCard key={n.id} nursery={n} onEnquire={() => setSelected(n)} />
+              ))}
+            </div>
+          )
         )}
       </div>
     </div>

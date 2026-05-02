@@ -40,3 +40,14 @@ export interface AIFilters {
   tags: string[];
   explanation: string;
 }
+
+export interface AIFilters {
+  area: string | null;
+  minAge: number | null;
+  maxAge: number | null;
+  ofsted: "Outstanding" | "Good" | "Requires Improvement" | null;
+  maxPrice: number | null;
+  availFilter: "available" | "waitlist" | "any";
+  tags: string[];
+  explanation: string;
+}
