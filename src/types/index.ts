@@ -39,5 +39,6 @@ export interface AIFilters {
   maxPrice: number | null;
   availFilter: "available" | "waitlist" | "any";
   tags: string[];
+  nameSearch: string | null;   // free-text match on name + area + description
   explanation: string;
 }

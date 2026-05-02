@@ -123,7 +123,9 @@ export function filterNurseries(
       !search ||
       n.name.toLowerCase().includes(search.toLowerCase()) ||
       n.area.toLowerCase().includes(search.toLowerCase()) ||
-      n.postcode.toLowerCase().includes(search.toLowerCase());
+      n.postcode.toLowerCase().includes(search.toLowerCase()) ||
+      n.description.toLowerCase().includes(search.toLowerCase()) ||
+      n.tags.some((t) => t.toLowerCase().includes(search.toLowerCase()));
 
     const matchPrice = n.price <= maxPrice;
 
@@ -144,6 +146,7 @@ export function filterNurseries(
 
 export function filterByAI(data: Nursery[], f: AIFilters): Nursery[] {
   return data.filter((n) => {
+    // Structured filters
     if (f.area && !n.area.toLowerCase().includes(f.area.toLowerCase())) return false;
     if (f.ofsted && n.ofsted !== f.ofsted) return false;
     if (f.maxPrice != null && n.price > f.maxPrice) return false;
@@ -152,6 +155,18 @@ export function filterByAI(data: Nursery[], f: AIFilters): Nursery[] {
     if (f.availFilter === "available" && n.spaces === 0) return false;
     if (f.availFilter === "waitlist" && n.spaces > 0) return false;
     if (f.tags.length > 0 && !f.tags.some((t) => n.tags.includes(t))) return false;
+
+    // Free-text search — name, area, description, tags (partial/half-written words work via includes)
+    if (f.nameSearch) {
+      const searchable = [n.name, n.area, n.description, ...n.tags]
+        .join(" ")
+        .toLowerCase();
+      const words = f.nameSearch.split(/\s+/);
+      // ALL words must appear somewhere in the searchable text
+      const allMatch = words.every((w) => searchable.includes(w));
+      if (!allMatch) return false;
+    }
+
     return true;
   });
 }

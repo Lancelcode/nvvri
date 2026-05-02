@@ -11,6 +11,24 @@ const DISTRICT_MAP: Record<string, string> = {
   "eh12": "Corstorphine",
 };
 
+// Words that belong to structured filters — excluded from free-text search
+const FILTER_WORDS = new Set([
+  "baby","babies","infant","newborn","toddler","toddlers","preschool","year","years",
+  "month","months","week","weeks","under","aged","age","old",
+  "outstanding","good","requires","improvement","needs","rated","rating","ofsted",
+  "cheap","affordable","budget","inexpensive","max","maximum","around","approximately",
+  "roughly","about","per","day","pounds","pound","price","cost",
+  "available","spaces","space","waitlist","waiting","wait","list","immediate","immediately","asap",
+  "outdoor","outdoors","outside","forest","nature","natural","garden","gardening",
+  "bilingual","dual","language","french","stem","science","technology","engineering",
+  "coding","robotics","arts","art","craft","crafts","creative","painting","drawing",
+  "funded","funding","free","hours","hour","flexible","sessional","part","time","yoga",
+  "large","big","setting","school","nursery","nurseries",
+  "morningside","leith","bruntsfield","newington","stockbridge","corstorphine",
+  "find","show","want","looking","look","need","for","the","and","with","in","near",
+  "at","a","an","is","has","have","i","me","my","please","can","you","that","which","where",
+]);
+
 export const THINKING_STEPS = [
   "Reading your search...",
   "Identifying what you need...",
@@ -19,51 +37,59 @@ export const THINKING_STEPS = [
 ] as const;
 
 // ─── Normalise ────────────────────────────────────────────────────────────────
-// Lowercase, collapse whitespace, normalise apostrophes
-// Run once at the top — all resolvers receive the cleaned string
 
 function normalise(raw: string): string {
   return raw
     .toLowerCase()
-    .replace(/[''`]/g, "'")   // curly apostrophes → straight
-    .replace(/\s+/g, " ")     // collapse runs of whitespace
+    .replace(/[''`]/g, "'")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
 // ─── Area ─────────────────────────────────────────────────────────────────────
 
 function resolveArea(q: string): string | null {
-  // Strip punctuation that might follow an area name: "leith." "leith," "leith!"
   const stripped = q.replace(/[.,!?;:]+/g, " ");
 
-  // 1. Named area — word-boundary match so "newington" doesn't catch "kenningtonewington"
-  const byName = AREAS.find((a) =>
+  // 1. Exact area name (word-boundary)
+  const exact = AREAS.find((a) =>
     new RegExp(`\\b${a.toLowerCase()}\\b`).test(stripped)
   );
-  if (byName) return byName;
+  if (exact) return exact;
 
-  // 2. Full postcode — handles:
-  //    EH10 4HR   (space)
-  //    EH104HR    (no space)
-  //    EH10-4HR   (hyphen)
-  //    EH10  4HR  (double space, normalised to single above)
-  const postcodeMatch = q.match(/\b(eh\d{1,2})[\s\-]?(\d[a-z]{2})\b/i);
-  if (postcodeMatch) {
-    const formatted = `${postcodeMatch[1].toUpperCase()} ${postcodeMatch[2].toUpperCase()}`;
+  // 2. Full postcode — EH10 4HR, EH104HR, EH10-4HR (any case/spacing)
+  const fullMatch = q.match(/\b(eh\d{1,2})[\s\-]?(\d[a-z]{2})\b/i);
+  if (fullMatch) {
+    const formatted = `${fullMatch[1].toUpperCase()} ${fullMatch[2].toUpperCase()}`;
     const hit = nurseries.find((n) => n.postcode === formatted);
     if (hit) return hit.area;
   }
 
-  // 3. District prefix only (EH6, EH9, EH3, EH12, EH10)
+  // 3. Inward code only (e.g. "4BX", "4HR") — search all postcodes for match
+  const inwardMatch = q.match(/\b(\d[a-z]{2})\b/i);
+  if (inwardMatch) {
+    const inward = inwardMatch[1].toUpperCase();
+    const hit = nurseries.find((n) => n.postcode.endsWith(inward));
+    if (hit) return hit.area;
+  }
+
+  // 4. District prefix — EH6, EH12, etc.
   const districtMatch = q.match(/\b(eh\d{1,2})\b/i);
   if (districtMatch) {
     const district = districtMatch[1].toLowerCase();
     if (DISTRICT_MAP[district]) return DISTRICT_MAP[district];
-    // Ambiguous prefix (EH10) — return first nursery whose postcode starts with it
     const hit = nurseries.find((n) =>
       n.postcode.toLowerCase().startsWith(district + " ")
     );
     if (hit) return hit.area;
+  }
+
+  // 5. Partial/half-written area name — min 4 chars, prefix match
+  //    "mornings" → Morningside, "stock" → Stockbridge, "brunts" → Bruntsfield
+  const words = stripped.split(/\s+/).filter((w) => w.length >= 4);
+  for (const word of words) {
+    const partial = AREAS.find((a) => a.toLowerCase().startsWith(word));
+    if (partial) return partial;
   }
 
   return null;
@@ -72,12 +98,12 @@ function resolveArea(q: string): string | null {
 // ─── Age ──────────────────────────────────────────────────────────────────────
 
 function resolveAge(q: string): { minAge: number | null; maxAge: number | null } {
-  // Weeks → definite baby (e.g. "6 weeks old", "10 weeks")
+  // Weeks → baby
   if (/\b\d+\s*weeks?(?:\s*old)?\b/.test(q)) {
     return { minAge: 0, maxAge: 0.9 };
   }
 
-  // Months — "6 months", "6 months old", "6-month-old", "my son is 8 months"
+  // Months
   const monthsMatch = q.match(/\b(\d{1,2})[\s\-]months?(?:[\s\-]old)?\b/);
   if (monthsMatch) {
     const months = Number(monthsMatch[1]);
@@ -91,18 +117,17 @@ function resolveAge(q: string): { minAge: number | null; maxAge: number | null }
     return { minAge: 0, maxAge: 0.9 };
   }
 
-  // Toddler keywords
+  // Toddler
   if (/\btoddlers?\b/.test(q)) {
     return { minAge: 1, maxAge: 2.9 };
   }
 
-  // Preschool keywords
+  // Preschool
   if (/\b(preschool|pre[\s\-]school|nursery\s*school)\b/.test(q)) {
     return { minAge: 3, maxAge: 5 };
   }
 
-  // Natural age phrases — "2 year old", "2-year-old", "aged 3", "she's 4", "my 18 month old"
-  // Only match ages 0–5 (valid nursery ages)
+  // "2 year old", "aged 3", "she's 4", "my 2-year-old"
   const yearPhrases = q.match(
     /\b(?:aged?|my|is|she'?s|he'?s|turning|for\s+(?:a|my))?\s*([0-5])[\s\-]?years?(?:[\s\-]old)?\b/
   );
@@ -113,12 +138,10 @@ function resolveAge(q: string): { minAge: number | null; maxAge: number | null }
     return { minAge: age - 0.5, maxAge: Math.min(5, age + 0.9) };
   }
 
-  // "under X" where X is 1–5 — age context, not price
-  // "under 50" is price; "under 5" is age
-  const underAgeMatch = q.match(/\bunder\s+([1-5])\b/);
-  if (underAgeMatch) {
-    const age = Number(underAgeMatch[1]);
-    return { minAge: 0, maxAge: age - 0.1 };
+  // "under X" where X is 1–5 (age, not price)
+  const underAge = q.match(/\bunder\s+([1-5])\b/);
+  if (underAge) {
+    return { minAge: 0, maxAge: Number(underAge[1]) - 0.1 };
   }
 
   return { minAge: null, maxAge: null };
@@ -127,32 +150,29 @@ function resolveAge(q: string): { minAge: number | null; maxAge: number | null }
 // ─── Price ────────────────────────────────────────────────────────────────────
 
 function resolvePrice(q: string): number | null {
-  // Range "£50-£60" or "£50 to £60" — use upper bound
-  const rangeMatch = q.match(/£(\d+)\s*(?:[\-–]|to)\s*£?(\d+)/);
-  if (rangeMatch) return Number(rangeMatch[2]);
+  // Range £50-£60 — use upper bound
+  const range = q.match(/£(\d+)\s*(?:[\-–]|to)\s*£?(\d+)/);
+  if (range) return Number(range[2]);
 
-  // "around/approximately/roughly £X" — add £5 buffer
-  const aroundMatch = q.match(/\b(?:around|approximately|roughly|about)\s*£?(\d+)/);
-  if (aroundMatch) return Number(aroundMatch[1]) + 5;
+  // "around £X"
+  const around = q.match(/\b(?:around|approximately|roughly|about)\s*£?(\d+)/);
+  if (around) return Number(around[1]) + 5;
 
-  // Explicit ceiling — only if value >= 20 to avoid catching age expressions
-  // "under £55/day", "less than 60 a day", "max £70", "50 pounds a day"
-  const ceilMatch = q.match(
+  // Explicit ceiling — only >= 20 to avoid catching age
+  const ceil = q.match(
     /\b(?:under|less\s+than|below|max(?:imum)?|up\s+to)\s*£?(\d{2,})|£?(\d{2,})\s*(?:a\s+day|per\s+day|\/day|p\.?d\.?)|(\d{2,})\s*pounds?(?:\s*a\s+day)?/
   );
-  if (ceilMatch) {
-    const val = Number(ceilMatch[1] ?? ceilMatch[2] ?? ceilMatch[3]);
+  if (ceil) {
+    const val = Number(ceil[1] ?? ceil[2] ?? ceil[3]);
     if (val >= 20) return val;
   }
 
-  // Vague affordability
   if (/\b(cheap|affordable|budget|inexpensive|low[\s\-]cost)\b/.test(q)) return 52;
 
   return null;
 }
 
 // ─── Availability ─────────────────────────────────────────────────────────────
-// Be specific — "outdoor spaces" must NOT trigger this
 
 function resolveAvailability(q: string): AIFilters["availFilter"] {
   if (
@@ -165,22 +185,15 @@ function resolveAvailability(q: string): AIFilters["availFilter"] {
 }
 
 // ─── Ofsted ───────────────────────────────────────────────────────────────────
-// "good" alone is risky — "good for babies", "a good area", "good location"
-// Only treat bare "good" as Ofsted if it's not followed by common adjective continuations
 
 function resolveOfsted(q: string): AIFilters["ofsted"] {
   if (/\boutstanding\b/.test(q)) return "Outstanding";
   if (/\b(requires?\s+improvement|needs?\s+improvement)\b/.test(q)) return "Requires Improvement";
-
-  // Explicit Ofsted-good signals
   if (/\b(good\s+(?:ofsted|rating|rated)|ofsted[\s\-]good|rated\s+good)\b/.test(q)) return "Good";
-
-  // Bare "good" — only if not followed by words that make it a generic adjective
   if (
     /\bgood\b/.test(q) &&
     !/\bgood\s+(?:for|with|at|in|near|and|area|location|option|place|one|value|price)\b/.test(q)
   ) return "Good";
-
   return null;
 }
 
@@ -189,51 +202,48 @@ function resolveOfsted(q: string): AIFilters["ofsted"] {
 function resolveTags(q: string): string[] {
   const tags: string[] = [];
 
-  // Outdoor Learning
   if (/\b(outdoor|outdoors|outside|forest[\s\-]school|forest\s+sessions?|fresh\s+air)\b/.test(q))
     tags.push("Outdoor Learning");
-
-  // Nature Play
   if (/\b(nature[\s\-](?:play|based|walk)|natural\s+play)\b/.test(q))
     tags.push("Nature Play");
-
-  // Garden
   if (/\b(garden|gardening)\b/.test(q))
     tags.push("Garden");
-
-  // Bilingual
-  if (/\b(bilingual|dual[\s\-]language|two\s+languages?|french|français)\b/.test(q))
+  if (/\b(bilingual|dual[\s\-]language|two\s+languages?|french|français|english[\s\/]french)\b/.test(q))
     tags.push("Bilingual");
-
-  // STEM Focus
-  if (/\b(stem|science|technology|engineering|coding|robotics|maths?\s+focus)\b/.test(q))
+  if (/\b(stem|science|technology|engineering|coding|robotics|play\s+zones?)\b/.test(q))
     tags.push("STEM Focus");
-
-  // Arts & Crafts
   if (/\b(arts?\s+and\s+crafts?|arts?|crafts?|creative|painting|drawing)\b/.test(q))
     tags.push("Arts & Crafts");
-
-  // Funded Places — also catches "15 hours" / "30 hours" (Scottish/UK funded childcare)
   if (/\b(funded[\s\-]place|funded\s+hours?|free\s+hours?|15\s+hours?|30\s+hours?|government\s+hours?|funding)\b/.test(q))
     tags.push("Funded Places");
-
-  // Flexible Hours
-  if (/\b(flexible(?:\s+hours?)?|part[\s\-]time|part\s+days?|sessional)\b/.test(q))
+  if (/\b(flexible(?:\s+hours?)?|part[\s\-]time|part\s+days?|sessional|flexible\s+working)\b/.test(q))
     tags.push("Flexible Hours");
-
-  // Yoga
   if (/\byoga\b/.test(q))
     tags.push("Yoga");
-
-  // Large Setting
-  if (/\b(large[\s\-]setting|big[\s\-]setting|large\s+nursery|big\s+nursery)\b/.test(q))
+  if (/\b(large[\s\-]setting|big[\s\-]setting|large\s+nursery|big\s+nursery|large\s+outdoor)\b/.test(q))
     tags.push("Large Setting");
-
-  // Nursery School
   if (/\b(nursery[\s\-]school|school[\s\-]nursery)\b/.test(q))
     tags.push("Nursery School");
 
   return tags;
+}
+
+// ─── Name / free-text search ──────────────────────────────────────────────────
+// Captures words that didn't match any structured filter.
+// Used for partial nursery name matching and description keyword search.
+// e.g. "meadow" → finds Meadowside, "inverleith" → finds Little Explorers
+
+function resolveNameSearch(q: string): string | null {
+  const words = q
+    .split(/\s+/)
+    .filter((w) =>
+      w.length >= 3 &&               // ignore tiny words
+      !FILTER_WORDS.has(w) &&        // not a filter keyword
+      !/^[£\d\-–]+$/.test(w) &&     // not a number or price
+      !/^eh\d/i.test(w)              // not a postcode
+    );
+
+  return words.length > 0 ? words.join(" ") : null;
 }
 
 // ─── Explanation ──────────────────────────────────────────────────────────────
@@ -243,6 +253,7 @@ function buildExplanation(f: Omit<AIFilters, "explanation">): string {
   if (f.ofsted) parts.push(f.ofsted);
   parts.push("nurseries");
   if (f.area) parts.push(`in ${f.area}`);
+  else if (f.nameSearch) parts.push(`matching "${f.nameSearch}"`);
   if (f.maxAge !== null && f.maxAge < 1) parts.push("for babies");
   else if (f.minAge !== null && f.minAge >= 1 && f.maxAge !== null && f.maxAge < 3) parts.push("for toddlers");
   else if (f.minAge !== null && f.minAge >= 3) parts.push("for preschoolers");
@@ -250,7 +261,6 @@ function buildExplanation(f: Omit<AIFilters, "explanation">): string {
   if (f.availFilter === "available") parts.push("with spaces available");
   if (f.availFilter === "waitlist") parts.push("on waitlist only");
   if (f.tags.length > 0) parts.push(`with ${f.tags.join(" & ").toLowerCase()}`);
-  // Nothing resolved — show something sensible rather than just "nurseries"
   if (parts.length === 1 && parts[0] === "nurseries") return "all nurseries";
   return parts.join(" ");
 }
@@ -266,6 +276,7 @@ export function parseQuery(query: string): AIFilters {
     maxPrice:    resolvePrice(q),
     availFilter: resolveAvailability(q),
     tags:        resolveTags(q),
+    nameSearch:  resolveNameSearch(q),
     ...resolveAge(q),
   };
 
