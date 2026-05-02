@@ -132,7 +132,7 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## `$ deploy --one-click`
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/Lancelcode/nvvri)
+[![Deploy with Vercel](https://vercel.com/button)](https://nvvri.vercel.app/)
 
 ---
 
