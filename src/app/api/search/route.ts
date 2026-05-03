@@ -40,22 +40,28 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing query" }, { status: 400 });
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
     return NextResponse.json({ error: "No API key configured" }, { status: 501 });
   }
 
   try {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`,
+      "https://api.groq.com/openai/v1/chat/completions",
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`,
+        },
         body: JSON.stringify({
-          contents: [{
-            parts: [{ text: `${SYSTEM_PROMPT}\n\nUser query: ${query}` }]
-          }],
-          generationConfig: { temperature: 0, maxOutputTokens: 512 },
+          model: "llama-3.1-8b-instant",
+          max_tokens: 512,
+          temperature: 0,
+          messages: [
+            { role: "system", content: SYSTEM_PROMPT },
+            { role: "user", content: query },
+          ],
         }),
         signal: AbortSignal.timeout(8000),
       }
@@ -63,22 +69,22 @@ export async function POST(req: NextRequest) {
 
     if (!response.ok) {
       const errorBody = await response.json().catch(() => ({ raw: "could not parse" }));
-      console.error("Gemini error:", JSON.stringify(errorBody));
+      console.error("Groq error:", JSON.stringify(errorBody));
       return NextResponse.json(
-        { error: "Gemini request failed", geminiStatus: response.status, detail: errorBody },
+        { error: "Groq request failed", groqStatus: response.status, detail: errorBody },
         { status: 502 }
       );
     }
 
     const data = await response.json();
-    const text: string = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+    const text: string = data.choices?.[0]?.message?.content ?? "";
     const cleaned = text.replace(/```(?:json)?/gi, "").trim();
     const filters: AIFilters = JSON.parse(cleaned);
 
     return NextResponse.json(filters);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error("Gemini search error:", message);
+    console.error("Groq search error:", message);
     return NextResponse.json(
       { error: "AI search unavailable", detail: message },
       { status: 503 }
