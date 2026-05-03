@@ -22,7 +22,7 @@
 
 Finding a nursery in the UK is surprisingly broken. Parents search across five different sites, call nurseries individually, and still cannot easily compare Ofsted ratings, fees, and availability in one place.
 
-nvvri is a proof of concept for what that experience should look like. Built to understand the problem space — not to collect stars.
+nvvri is a proof of concept for what that experience should look like. Built to understand the problem space
 
 ---
 
