@@ -49,6 +49,7 @@ export function EnquiryModal({ nursery, onClose }: Props) {
   const [form, setForm]             = useState<EnquiryForm>({ name: "", email: "", phone: "", childDob: "", startDate: "", message: "" });
   const [errors, setErrors]         = useState<FormErrors>({});
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
   const isMobile = useIsMobile();
 
   useEffect(() => {
@@ -70,11 +71,33 @@ export function EnquiryModal({ nursery, onClose }: Props) {
     setStep(2);
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     const errs = validateStep2(form);
     if (Object.keys(errs).length > 0) { setErrors(errs); return; }
     setSubmitting(true);
-    setTimeout(() => setStep(3), 900);
+    setSubmitError("");
+    try {
+      const res = await fetch("/api/enquiry", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nurseryName: nursery.name,
+          nurseryArea: nursery.area,
+          name: form.name,
+          email: form.email,
+          phone: form.phone,
+          childDob: form.childDob,
+          startDate: form.startDate,
+          message: form.message,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      setStep(3);
+    } catch {
+      setSubmitError("Something went wrong. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -110,7 +133,7 @@ export function EnquiryModal({ nursery, onClose }: Props) {
               Enquiry sent
             </p>
             <p style={{ fontSize: 14, color: "#64748b", marginBottom: 24, lineHeight: 1.6 }}>
-              {nursery.name} will be in touch within 24 hours.
+              {nursery.name} will be in touch within 24 hours. Check your email for confirmation.
             </p>
             <button onClick={onClose} style={{
               background: "#1a7a4a", color: "white", border: "none", borderRadius: 8,
@@ -214,8 +237,11 @@ export function EnquiryModal({ nursery, onClose }: Props) {
                     placeholder="Any questions or specific requirements..." rows={3}
                     style={{ ...inputStyle, resize: "none" }} />
                 </div>
+                {submitError && (
+                  <p style={{ fontSize: 13, color: "#dc2626", margin: 0, textAlign: "center" }}>{submitError}</p>
+                )}
                 <div style={{ display: "flex", gap: 8 }}>
-                  <button onClick={() => { setErrors({}); setStep(1); }} style={{
+                  <button onClick={() => { setErrors({}); setSubmitError(""); setStep(1); }} style={{
                     flex: 1, background: "none", border: "1px solid #e2e8f0", borderRadius: 8,
                     padding: "11px 0", fontSize: 14, cursor: "pointer", color: "#0f172a",
                   }}>
