@@ -52,8 +52,9 @@ export async function POST(req: NextRequest) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-          contents: [{ parts: [{ text: query }] }],
+          contents: [{
+            parts: [{ text: `${SYSTEM_PROMPT}\n\nUser query: ${query}` }]
+          }],
           generationConfig: { temperature: 0, maxOutputTokens: 512 },
         }),
         signal: AbortSignal.timeout(8000),
@@ -61,7 +62,6 @@ export async function POST(req: NextRequest) {
     );
 
     if (!response.ok) {
-      // Expose the real Gemini error so we can debug
       const errorBody = await response.json().catch(() => ({ raw: "could not parse" }));
       console.error("Gemini error:", JSON.stringify(errorBody));
       return NextResponse.json(
