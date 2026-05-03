@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import type { Nursery, EnquiryForm } from "@/types";
 
 interface Props {
@@ -44,10 +45,11 @@ function validateStep2(form: EnquiryForm): FormErrors {
 }
 
 export function EnquiryModal({ nursery, onClose }: Props) {
-  const [step, setStep]         = useState<Step>(1);
-  const [form, setForm]         = useState<EnquiryForm>({ name: "", email: "", phone: "", childDob: "", startDate: "", message: "" });
-  const [errors, setErrors]     = useState<FormErrors>({});
+  const [step, setStep]             = useState<Step>(1);
+  const [form, setForm]             = useState<EnquiryForm>({ name: "", email: "", phone: "", childDob: "", startDate: "", message: "" });
+  const [errors, setErrors]         = useState<FormErrors>({});
   const [submitting, setSubmitting] = useState(false);
+  const isMobile = useIsMobile();
 
   // ESC to close
   useEffect(() => {
@@ -80,14 +82,21 @@ export function EnquiryModal({ nursery, onClose }: Props) {
     <div
       style={{
         position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        zIndex: 50, padding: 16,
+        display: "flex", alignItems: isMobile ? "flex-end" : "center", justifyContent: "center",
+        zIndex: 50, padding: isMobile ? 0 : 16,
       }}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div style={{
-        background: "white", borderRadius: 16, width: "100%", maxWidth: 480,
-        padding: 28, border: "1px solid #e2e8f0", boxShadow: "0 20px 60px rgba(0,0,0,0.15)",
+        background: "white",
+        borderRadius: isMobile ? "16px 16px 0 0" : 16,
+        width: "100%", maxWidth: isMobile ? "100%" : 480,
+        padding: isMobile ? "24px 20px" : 28,
+        border: "1px solid #e2e8f0",
+        boxShadow: "0 20px 60px rgba(0,0,0,0.15)",
+        // On mobile, allow scroll if content is tall
+        maxHeight: isMobile ? "92vh" : "auto",
+        overflowY: isMobile ? "auto" : "visible",
       }}>
         {step === 3 ? (
           <div style={{ textAlign: "center", padding: "24px 0" }}>
@@ -158,7 +167,7 @@ export function EnquiryModal({ nursery, onClose }: Props) {
 
             {step === 1 && (
               <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12 }}>
                   <div>
                     <label style={labelStyle}>Full name *</label>
                     <input value={form.name} onChange={update("name")} placeholder="Your name"
@@ -189,7 +198,7 @@ export function EnquiryModal({ nursery, onClose }: Props) {
 
             {step === 2 && (
               <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12 }}>
                   <div>
                     <label style={labelStyle}>Child date of birth *</label>
                     <input type="date" value={form.childDob} onChange={update("childDob")}
