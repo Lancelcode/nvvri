@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
           "Authorization": `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: "openrouter/auto",
+          model: "meta-llama/llama-3.3-70b-instruct:free",
           max_tokens: 512,
           temperature: 0,
           messages: [
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
             { role: "user", content: query },
           ],
         }),
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(15000),
       }
     );
 
