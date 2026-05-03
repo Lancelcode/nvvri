@@ -8,41 +8,73 @@ import { nurseries, filterNurseries, filterByAI, sortNurseries } from "@/lib/dat
 import { parseQuery } from "@/lib/aiSearch";
 import type { Nursery, AgeFilter, AvailFilter, AIFilters, SortOption } from "@/types";
 
-export default function HomePage() {
-  const [search, setSearch]         = useState("");
-  const [maxPrice, setMaxPrice]     = useState(70);
-  const [ageFilter, setAgeFilter]   = useState<AgeFilter>("any");
-  const [availFilter, setAvailFilter] = useState<AvailFilter>("any");
-  const [sort, setSort]             = useState<SortOption>("rating");
-  const [selected, setSelected]     = useState<Nursery | null>(null);
+// ─── AI search with graceful degradation ─────────────────────────────────────
+// 1. Try Gemini via /api/search (real LLM)
+// 2. If that fails or times out → fall back to local parser (instant, offline)
+// User never sees an error — search always works.
 
-  const [aiQuery, setAiQuery]       = useState("");
-  const [aiFilters, setAiFilters]   = useState<AIFilters | null>(null);
-  const [aiThinking, setAiThinking] = useState(false);
+async function smartSearch(query: string): Promise<{ filters: AIFilters; usedAI: boolean }> {
+  try {
+    const res = await fetch("/api/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query }),
+    });
+
+    if (!res.ok) throw new Error("API failed");
+
+    const filters: AIFilters = await res.json();
+    // Sanity check — if Gemini returned something malformed, fall back
+    if (!filters || typeof filters !== "object" || !("explanation" in filters)) {
+      throw new Error("Invalid response shape");
+    }
+
+    return { filters, usedAI: true };
+  } catch {
+    // Silent fallback to local parser
+    return { filters: parseQuery(query), usedAI: false };
+  }
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
+export default function HomePage() {
+  const [search, setSearch]           = useState("");
+  const [maxPrice, setMaxPrice]       = useState(70);
+  const [ageFilter, setAgeFilter]     = useState<AgeFilter>("any");
+  const [availFilter, setAvailFilter] = useState<AvailFilter>("any");
+  const [sort, setSort]               = useState<SortOption>("rating");
+  const [selected, setSelected]       = useState<Nursery | null>(null);
+
+  const [aiQuery, setAiQuery]         = useState("");
+  const [aiFilters, setAiFilters]     = useState<AIFilters | null>(null);
+  const [aiThinking, setAiThinking]   = useState(false);
+  const [usedRealAI, setUsedRealAI]   = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const base = aiFilters
+  const base     = aiFilters
     ? filterByAI(nurseries, aiFilters)
     : filterNurseries(nurseries, search, maxPrice, ageFilter, availFilter);
-
   const filtered = sortNurseries(base, sort);
 
-  function handleAISearch() {
+  async function handleAISearch() {
     if (!aiQuery.trim()) return;
     setAiThinking(true);
     setAiFilters(null);
-    // Client-side intent parser — swap setTimeout body for a real API call when ready
-    setTimeout(() => {
-      setAiFilters(parseQuery(aiQuery));
-      setAiThinking(false);
-    }, 1800);
+    setUsedRealAI(false);
+
+    const { filters, usedAI } = await smartSearch(aiQuery);
+    setAiFilters(filters);
+    setUsedRealAI(usedAI);
+    setAiThinking(false);
   }
 
   function clearAISearch() {
     setAiFilters(null);
     setAiQuery("");
     setAiThinking(false);
+    setUsedRealAI(false);
     inputRef.current?.focus();
   }
 
@@ -80,7 +112,10 @@ export default function HomePage() {
       {/* Hero */}
       <div style={{ background: "white", borderBottom: "1px solid #e2e8f0", padding: "32px 24px" }}>
         <div style={{ maxWidth: 680, margin: "0 auto", textAlign: "center" }}>
-          <h1 style={{ fontSize: 30, fontWeight: 700, color: "#0f172a", margin: "0 0 8px", letterSpacing: "-0.03em" }}>
+          <h1 style={{
+            fontSize: 30, fontWeight: 700, color: "#0f172a",
+            margin: "0 0 8px", letterSpacing: "-0.03em",
+          }}>
             Find the right nursery for your child
           </h1>
           <p style={{ fontSize: 15, color: "#64748b", margin: "0 0 24px" }}>
@@ -147,7 +182,7 @@ export default function HomePage() {
       </div>
 
       {/* Results */}
-      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "24px 24px" }}>
+      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "24px" }}>
 
         {aiThinking && <ThinkingIndicator />}
 
@@ -158,7 +193,7 @@ export default function HomePage() {
             padding: "11px 16px", marginBottom: 20,
             display: "flex", alignItems: "center", justifyContent: "space-between",
           }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               <span style={{ fontSize: 13 }}>✦</span>
               <span style={{ fontSize: 14, color: "#15803d", fontWeight: 500 }}>
                 {aiFilters.explanation}
@@ -166,18 +201,27 @@ export default function HomePage() {
               <span style={{ fontSize: 13, color: "#94a3b8" }}>
                 · {filtered.length} result{filtered.length !== 1 ? "s" : ""}
               </span>
+              {/* Show whether real AI or local parser was used — honest signal */}
+              <span style={{
+                fontSize: 11, padding: "2px 7px", borderRadius: 20,
+                background: usedRealAI ? "#eff6ff" : "#f1f5f9",
+                color: usedRealAI ? "#3b82f6" : "#94a3b8",
+                border: `1px solid ${usedRealAI ? "#bfdbfe" : "#e2e8f0"}`,
+              }}>
+                {usedRealAI ? "Gemini AI" : "local parser"}
+              </span>
             </div>
             <button onClick={clearAISearch} style={{
               background: "none", border: "1px solid #86efac", borderRadius: 6,
               padding: "4px 10px", fontSize: 12, color: "#15803d",
-              cursor: "pointer", fontWeight: 500,
+              cursor: "pointer", fontWeight: 500, flexShrink: 0,
             }}>
               Clear
             </button>
           </div>
         )}
 
-        {/* Filters + sort bar */}
+        {/* Filters + sort */}
         {!aiThinking && (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 24, alignItems: "center" }}>
             {!aiFilters && (
@@ -205,8 +249,6 @@ export default function HomePage() {
                 </select>
               </>
             )}
-
-            {/* Sort — always visible */}
             <select value={sort} onChange={(e) => setSort(e.target.value as SortOption)}
               style={{ padding: "7px 12px", borderRadius: 8, border: "1.5px solid #e2e8f0", fontSize: 13, background: "white", cursor: "pointer", color: "#0f172a" }}>
               <option value="rating">Sort: Top rated</option>
@@ -214,7 +256,6 @@ export default function HomePage() {
               <option value="price-desc">Sort: Price high–low</option>
               <option value="spaces">Sort: Most spaces</option>
             </select>
-
             <span style={{ fontSize: 13, color: "#94a3b8", marginLeft: "auto" }}>
               {filtered.length} nurserie{filtered.length !== 1 ? "s" : ""}
             </span>

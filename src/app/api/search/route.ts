@@ -1,64 +1,83 @@
-/**
- * AI Search API Route
- *
- * This route is ready to accept a natural language query and return
- * structured nursery filters via a real LLM call.
- *
- * Currently unused — the app uses a client-side intent parser (src/lib/aiSearch.ts)
- * to avoid exposing API keys in a public repo.
- *
- * To enable real AI search:
- * 1. Add ANTHROPIC_API_KEY (or GEMINI_API_KEY) to .env.local
- * 2. Replace the client-side parseQuery() call in page.tsx with a fetch to this route
- * 3. Uncomment the implementation below
- */
+import { NextRequest, NextResponse } from "next/server";
+import type { AIFilters } from "@/types";
 
-import { NextResponse } from "next/server";
+const SYSTEM_PROMPT = `You are a search parser for a nursery finder app in Edinburgh.
+Extract search intent from natural language and return ONLY valid JSON — no markdown, no explanation, no backticks.
 
-export async function POST() {
-  return NextResponse.json(
-    { error: "Real AI search not enabled in this demo. See route.ts for instructions." },
-    { status: 501 }
-  );
+Available areas: Morningside, Leith, Bruntsfield, Newington, Stockbridge, Corstorphine
+Available ofsted values: "Outstanding", "Good", "Requires Improvement"
+Available tags: "Outdoor Learning", "Nursery School", "Bilingual", "STEM Focus", "Arts & Crafts", "Garden", "Flexible Hours", "Funded Places", "Nature Play", "Yoga", "Large Setting"
+
+Age rules:
+- baby/infant/newborn/under 1 = minAge: 0, maxAge: 0.9
+- toddler/1-2 years = minAge: 1, maxAge: 2.9  
+- preschool/3-5 years = minAge: 3, maxAge: 5
+- X months old: convert to years (e.g. 6 months = 0.5)
+
+Postcode rules: EH10 4BX → Morningside, EH10 4HR → Bruntsfield, EH6 8DB → Leith, EH9 1QH → Newington, EH3 5NE → Stockbridge, EH12 7AA → Corstorphine
+
+Return exactly this JSON shape:
+{
+  "area": string | null,
+  "minAge": number | null,
+  "maxAge": number | null,
+  "ofsted": "Outstanding" | "Good" | "Requires Improvement" | null,
+  "maxPrice": number | null,
+  "availFilter": "available" | "waitlist" | "any",
+  "tags": string[],
+  "nameSearch": string | null,
+  "explanation": string
 }
 
-/*
-// Full implementation — uncomment and add API key to activate
-
-import { NextRequest, NextResponse } from "next/server";
+The "explanation" field: short human-readable summary e.g. "Outstanding nurseries in Leith for babies with outdoor learning".
+The "nameSearch" field: any free-text keywords that don't map to structured filters (e.g. nursery name fragments like "meadow", "bumblebee").
+If nothing matches a field use null or empty array or "any".`;
 
 export async function POST(req: NextRequest) {
   const { query } = await req.json();
+
   if (!query || typeof query !== "string") {
     return NextResponse.json({ error: "Missing query" }, { status: 400 });
   }
 
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": process.env.ANTHROPIC_API_KEY!,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-5",
-      max_tokens: 512,
-      system: `You are a search parser for a nursery finder. Return ONLY valid JSON, no markdown.
-Schema: { area: string|null, minAge: number|null, maxAge: number|null,
-          ofsted: "Outstanding"|"Good"|"Requires Improvement"|null,
-          maxPrice: number|null, availFilter: "available"|"waitlist"|"any",
-          tags: string[], explanation: string }`,
-      messages: [{ role: "user", content: query }],
-    }),
-  });
-
-  const data = await response.json();
-  const text = data.content?.[0]?.text ?? "{}";
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    return NextResponse.json({ error: "No API key configured" }, { status: 501 });
+  }
 
   try {
-    return NextResponse.json(JSON.parse(text));
-  } catch {
-    return NextResponse.json({ error: "Failed to parse AI response" }, { status: 500 });
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+          contents: [{ parts: [{ text: query }] }],
+          generationConfig: {
+            temperature: 0,        // deterministic — we want structured output not creativity
+            maxOutputTokens: 512,
+          },
+        }),
+        signal: AbortSignal.timeout(4000), // 4s timeout — fall back to local parser if slow
+      }
+    );
+
+    if (!response.ok) {
+      return NextResponse.json({ error: "Gemini request failed" }, { status: 502 });
+    }
+
+    const data = await response.json();
+    const text: string = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+
+    // Strip any markdown fences Gemini might add despite instructions
+    const cleaned = text.replace(/```(?:json)?/gi, "").trim();
+    const filters: AIFilters = JSON.parse(cleaned);
+
+    return NextResponse.json(filters);
+  } catch (err) {
+    // Any failure — timeout, parse error, network — signals the client to fall back
+    console.error("Gemini search error:", err);
+    return NextResponse.json({ error: "AI search unavailable" }, { status: 503 });
   }
 }
-*/
