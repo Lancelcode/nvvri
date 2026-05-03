@@ -86,8 +86,9 @@ export async function POST(req: NextRequest) {
 
       const data = await response.json();
       const text: string = data.choices?.[0]?.message?.content ?? "";
-      const cleaned = text.replace(/```(?:json)?/gi, "").trim();
-      const filters: AIFilters = JSON.parse(cleaned);
+      const match = text.match(/\{[\s\S]*\}/);
+      if (!match) throw new Error("No JSON found in response");
+      const filters: AIFilters = JSON.parse(match[0]);
 
       return NextResponse.json(filters);
 
