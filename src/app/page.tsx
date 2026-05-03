@@ -1,18 +1,13 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { NurseryCard } from "@/components/NurseryCard";
 import { EnquiryModal } from "@/components/EnquiryModal";
 import { ThinkingIndicator } from "@/components/ThinkingIndicator";
-import { nurseries, filterNurseries, filterByAI, sortNurseries } from "@/lib/data";
+import { filterNurseries, filterByAI, sortNurseries } from "@/lib/data";
 import { parseQuery } from "@/lib/aiSearch";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import type { Nursery, AgeFilter, AvailFilter, AIFilters, SortOption } from "@/types";
-
-// ─── AI search with graceful degradation ─────────────────────────────────────
-// 1. Try OpenRouter via /api/search (real LLM, multi-model fallback chain)
-// 2. If that fails or times out, fall back to local parser (instant, offline)
-// User never sees an error — search always works.
 
 async function smartSearch(query: string): Promise<{ filters: AIFilters; usedAI: boolean }> {
   try {
@@ -21,23 +16,21 @@ async function smartSearch(query: string): Promise<{ filters: AIFilters; usedAI:
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ query }),
     });
-
     if (!res.ok) throw new Error("API failed");
-
     const filters: AIFilters = await res.json();
     if (!filters || typeof filters !== "object" || !("explanation" in filters)) {
       throw new Error("Invalid response shape");
     }
-
     return { filters, usedAI: true };
   } catch {
     return { filters: parseQuery(query), usedAI: false };
   }
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
-
 export default function HomePage() {
+  const [nurseries, setNurseries]     = useState<Nursery[]>([]);
+  const [loading, setLoading]         = useState(true);
+
   const [search, setSearch]           = useState("");
   const [maxPrice, setMaxPrice]       = useState(70);
   const [ageFilter, setAgeFilter]     = useState<AgeFilter>("any");
@@ -53,6 +46,17 @@ export default function HomePage() {
   const inputRef = useRef<HTMLInputElement>(null);
   const isMobile = useIsMobile();
 
+  // Fetch nurseries from database on mount
+  useEffect(() => {
+    fetch("/api/nurseries")
+      .then((res) => res.json())
+      .then((data) => {
+        setNurseries(data);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
+
   const base     = aiFilters
     ? filterByAI(nurseries, aiFilters)
     : filterNurseries(nurseries, search, maxPrice, ageFilter, availFilter);
@@ -63,7 +67,6 @@ export default function HomePage() {
     setAiThinking(true);
     setAiFilters(null);
     setUsedRealAI(false);
-
     const { filters, usedAI } = await smartSearch(aiQuery);
     setAiFilters(filters);
     setUsedRealAI(usedAI);
@@ -189,15 +192,14 @@ export default function HomePage() {
       {/* Results */}
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: isMobile ? "16px" : "24px" }}>
 
-        {aiThinking && <ThinkingIndicator />}
+        {(aiThinking || loading) && <ThinkingIndicator />}
 
         {/* AI result pill */}
         {aiFilters && !aiThinking && (
           <div style={{
             background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10,
             padding: "11px 16px", marginBottom: 20,
-            display: "flex", alignItems: "center", justifyContent: "space-between",
-            gap: 8,
+            display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8,
           }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", minWidth: 0 }}>
               <span style={{ fontSize: 13 }}>✦</span>
@@ -228,7 +230,7 @@ export default function HomePage() {
         )}
 
         {/* Filters + sort */}
-        {!aiThinking && (
+        {!aiThinking && !loading && (
           <div style={{
             display: "flex", flexWrap: "wrap", gap: isMobile ? 8 : 12,
             marginBottom: 20, alignItems: "center",
@@ -289,7 +291,7 @@ export default function HomePage() {
         )}
 
         {/* Grid */}
-        {!aiThinking && (
+        {!aiThinking && !loading && (
           filtered.length === 0 ? (
             <div style={{ textAlign: "center", padding: "60px 0", color: "#94a3b8" }}>
               <p style={{ fontSize: 16, marginBottom: 8 }}>No nurseries match your search.</p>
