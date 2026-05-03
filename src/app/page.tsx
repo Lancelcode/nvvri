@@ -6,11 +6,12 @@ import { EnquiryModal } from "@/components/EnquiryModal";
 import { ThinkingIndicator } from "@/components/ThinkingIndicator";
 import { nurseries, filterNurseries, filterByAI, sortNurseries } from "@/lib/data";
 import { parseQuery } from "@/lib/aiSearch";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import type { Nursery, AgeFilter, AvailFilter, AIFilters, SortOption } from "@/types";
 
 // ─── AI search with graceful degradation ─────────────────────────────────────
-// 1. Try Gemini via /api/search (real LLM)
-// 2. If that fails or times out → fall back to local parser (instant, offline)
+// 1. Try OpenRouter via /api/search (real LLM, multi-model fallback chain)
+// 2. If that fails or times out, fall back to local parser (instant, offline)
 // User never sees an error — search always works.
 
 async function smartSearch(query: string): Promise<{ filters: AIFilters; usedAI: boolean }> {
@@ -24,14 +25,12 @@ async function smartSearch(query: string): Promise<{ filters: AIFilters; usedAI:
     if (!res.ok) throw new Error("API failed");
 
     const filters: AIFilters = await res.json();
-    // Sanity check — if Gemini returned something malformed, fall back
     if (!filters || typeof filters !== "object" || !("explanation" in filters)) {
       throw new Error("Invalid response shape");
     }
 
     return { filters, usedAI: true };
   } catch {
-    // Silent fallback to local parser
     return { filters: parseQuery(query), usedAI: false };
   }
 }
@@ -52,6 +51,7 @@ export default function HomePage() {
   const [usedRealAI, setUsedRealAI]   = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const isMobile = useIsMobile();
 
   const base     = aiFilters
     ? filterByAI(nurseries, aiFilters)
@@ -84,7 +84,8 @@ export default function HomePage() {
 
       {/* Nav */}
       <nav style={{
-        background: "white", borderBottom: "1px solid #e2e8f0", padding: "12px 24px",
+        background: "white", borderBottom: "1px solid #e2e8f0",
+        padding: isMobile ? "10px 16px" : "12px 24px",
         display: "flex", alignItems: "center", justifyContent: "space-between",
         position: "sticky", top: 0, zIndex: 40,
       }}>
@@ -100,49 +101,52 @@ export default function HomePage() {
           </div>
           <span style={{ fontWeight: 700, fontSize: 17, color: "#0f172a", letterSpacing: "-0.02em" }}>nvvri</span>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: 14, color: "#64748b" }}>For nurseries</span>
+        <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 8 : 12 }}>
+          {!isMobile && (
+            <span style={{ fontSize: 14, color: "#64748b" }}>For nurseries</span>
+          )}
           <button style={{
             background: "#1a7a4a", color: "white", border: "none", borderRadius: 8,
-            padding: "7px 16px", fontSize: 14, cursor: "pointer", fontWeight: 500,
+            padding: isMobile ? "7px 12px" : "7px 16px", fontSize: 14, cursor: "pointer", fontWeight: 500,
           }}>Sign in</button>
         </div>
       </nav>
 
       {/* Hero */}
-      <div style={{ background: "white", borderBottom: "1px solid #e2e8f0", padding: "32px 24px" }}>
+      <div style={{ background: "white", borderBottom: "1px solid #e2e8f0", padding: isMobile ? "24px 16px" : "32px 24px" }}>
         <div style={{ maxWidth: 680, margin: "0 auto", textAlign: "center" }}>
           <h1 style={{
-            fontSize: 30, fontWeight: 700, color: "#0f172a",
+            fontSize: isMobile ? 24 : 30, fontWeight: 700, color: "#0f172a",
             margin: "0 0 8px", letterSpacing: "-0.03em",
           }}>
             Find the right nursery for your child
           </h1>
-          <p style={{ fontSize: 15, color: "#64748b", margin: "0 0 24px" }}>
+          <p style={{ fontSize: 15, color: "#64748b", margin: "0 0 20px" }}>
             Search, compare, and enquire — all in one place.
           </p>
 
           {/* AI Search */}
           <div style={{
             background: "#f0fdf4", border: "1.5px solid #bbf7d0",
-            borderRadius: 14, padding: "16px 20px", marginBottom: 16,
+            borderRadius: 14, padding: isMobile ? "14px 16px" : "16px 20px", marginBottom: 12,
           }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
               <span style={{ fontSize: 14, fontWeight: 600, color: "#15803d" }}>✦ AI Search</span>
-              <span style={{ fontSize: 12, color: "#64748b" }}>describe what you're looking for</span>
+              <span style={{ fontSize: 12, color: "#64748b" }}>describe what you&apos;re looking for</span>
             </div>
-            <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: 8 }}>
               <input
                 ref={inputRef}
                 value={aiQuery}
                 onChange={(e) => setAiQuery(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleAISearch()}
                 disabled={aiThinking}
-                placeholder='e.g. Outstanding nursery in Leith for a baby with outdoor space'
+                placeholder="e.g. Outstanding nursery in Leith for a baby with outdoor space"
                 style={{
                   flex: 1, padding: "10px 14px", borderRadius: 8,
                   border: "1px solid #d1fae5", fontSize: 14,
                   background: "white", outline: "none", color: "#0f172a",
+                  width: isMobile ? "100%" : "auto", boxSizing: "border-box",
                 }}
               />
               <button
@@ -154,6 +158,7 @@ export default function HomePage() {
                   padding: "10px 20px", fontSize: 14, fontWeight: 600,
                   cursor: aiThinking ? "default" : "pointer",
                   whiteSpace: "nowrap", transition: "background 0.15s",
+                  width: isMobile ? "100%" : "auto",
                 }}
               >
                 {aiThinking ? "Thinking..." : "Search"}
@@ -182,7 +187,7 @@ export default function HomePage() {
       </div>
 
       {/* Results */}
-      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "24px" }}>
+      <div style={{ maxWidth: 1200, margin: "0 auto", padding: isMobile ? "16px" : "24px" }}>
 
         {aiThinking && <ThinkingIndicator />}
 
@@ -192,8 +197,9 @@ export default function HomePage() {
             background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10,
             padding: "11px 16px", marginBottom: 20,
             display: "flex", alignItems: "center", justifyContent: "space-between",
+            gap: 8,
           }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", minWidth: 0 }}>
               <span style={{ fontSize: 13 }}>✦</span>
               <span style={{ fontSize: 14, color: "#15803d", fontWeight: 500 }}>
                 {aiFilters.explanation}
@@ -201,14 +207,14 @@ export default function HomePage() {
               <span style={{ fontSize: 13, color: "#94a3b8" }}>
                 · {filtered.length} result{filtered.length !== 1 ? "s" : ""}
               </span>
-              {/* Show whether real AI or local parser was used — honest signal */}
               <span style={{
                 fontSize: 11, padding: "2px 7px", borderRadius: 20,
                 background: usedRealAI ? "#eff6ff" : "#f1f5f9",
                 color: usedRealAI ? "#3b82f6" : "#94a3b8",
                 border: `1px solid ${usedRealAI ? "#bfdbfe" : "#e2e8f0"}`,
+                whiteSpace: "nowrap",
               }}>
-                {usedRealAI ? "Gemini AI" : "local parser"}
+                {usedRealAI ? "AI" : "local parser"}
               </span>
             </div>
             <button onClick={clearAISearch} style={{
@@ -223,42 +229,62 @@ export default function HomePage() {
 
         {/* Filters + sort */}
         {!aiThinking && (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 24, alignItems: "center" }}>
+          <div style={{
+            display: "flex", flexWrap: "wrap", gap: isMobile ? 8 : 12,
+            marginBottom: 20, alignItems: "center",
+          }}>
             {!aiFilters && (
               <>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ width: isMobile ? "100%" : "auto", display: "flex", alignItems: "center", gap: 8 }}>
                   <label style={{ fontSize: 13, color: "#64748b", whiteSpace: "nowrap" }}>
-                    Max price: <strong style={{ color: "#0f172a" }}>£{maxPrice}/day</strong>
+                    Max: <strong style={{ color: "#0f172a" }}>£{maxPrice}/day</strong>
                   </label>
                   <input type="range" min={40} max={70} value={maxPrice}
                     onChange={(e) => setMaxPrice(Number(e.target.value))}
-                    style={{ width: 100, accentColor: "#1a7a4a" }} />
+                    style={{ flex: isMobile ? 1 : "unset", width: isMobile ? "auto" : 100, accentColor: "#1a7a4a" }} />
                 </div>
                 <select value={ageFilter} onChange={(e) => setAgeFilter(e.target.value as AgeFilter)}
-                  style={{ padding: "7px 12px", borderRadius: 8, border: "1.5px solid #e2e8f0", fontSize: 13, background: "white", cursor: "pointer", color: "#0f172a" }}>
+                  style={{
+                    padding: "7px 12px", borderRadius: 8, border: "1.5px solid #e2e8f0",
+                    fontSize: 13, background: "white", cursor: "pointer", color: "#0f172a",
+                    flex: isMobile ? 1 : "unset",
+                  }}>
                   <option value="any">Any age</option>
-                  <option value="baby">Baby (0–12m)</option>
-                  <option value="toddler">Toddler (1–2y)</option>
-                  <option value="preschool">Preschool (3–5y)</option>
+                  <option value="baby">Baby (0-12m)</option>
+                  <option value="toddler">Toddler (1-2y)</option>
+                  <option value="preschool">Preschool (3-5y)</option>
                 </select>
                 <select value={availFilter} onChange={(e) => setAvailFilter(e.target.value as AvailFilter)}
-                  style={{ padding: "7px 12px", borderRadius: 8, border: "1.5px solid #e2e8f0", fontSize: 13, background: "white", cursor: "pointer", color: "#0f172a" }}>
+                  style={{
+                    padding: "7px 12px", borderRadius: 8, border: "1.5px solid #e2e8f0",
+                    fontSize: 13, background: "white", cursor: "pointer", color: "#0f172a",
+                    flex: isMobile ? 1 : "unset",
+                  }}>
                   <option value="any">Any availability</option>
                   <option value="available">Spaces available</option>
                   <option value="waitlist">Waitlist only</option>
                 </select>
               </>
             )}
-            <select value={sort} onChange={(e) => setSort(e.target.value as SortOption)}
-              style={{ padding: "7px 12px", borderRadius: 8, border: "1.5px solid #e2e8f0", fontSize: 13, background: "white", cursor: "pointer", color: "#0f172a" }}>
-              <option value="rating">Sort: Top rated</option>
-              <option value="price-asc">Sort: Price low–high</option>
-              <option value="price-desc">Sort: Price high–low</option>
-              <option value="spaces">Sort: Most spaces</option>
-            </select>
-            <span style={{ fontSize: 13, color: "#94a3b8", marginLeft: "auto" }}>
-              {filtered.length} nurserie{filtered.length !== 1 ? "s" : ""}
-            </span>
+            <div style={{
+              display: "flex", alignItems: "center", gap: 8,
+              width: isMobile && !aiFilters ? "100%" : "auto",
+            }}>
+              <select value={sort} onChange={(e) => setSort(e.target.value as SortOption)}
+                style={{
+                  padding: "7px 12px", borderRadius: 8, border: "1.5px solid #e2e8f0",
+                  fontSize: 13, background: "white", cursor: "pointer", color: "#0f172a",
+                  flex: isMobile ? 1 : "unset",
+                }}>
+                <option value="rating">Top rated</option>
+                <option value="price-asc">Price low-high</option>
+                <option value="price-desc">Price high-low</option>
+                <option value="spaces">Most spaces</option>
+              </select>
+              <span style={{ fontSize: 13, color: "#94a3b8", whiteSpace: "nowrap" }}>
+                {filtered.length} {filtered.length !== 1 ? "nurseries" : "nursery"}
+              </span>
+            </div>
           </div>
         )}
 
@@ -277,7 +303,11 @@ export default function HomePage() {
               )}
             </div>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 20 }}>
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(320px, 1fr))",
+              gap: isMobile ? 16 : 20,
+            }}>
               {filtered.map((n) => (
                 <NurseryCard key={n.id} nursery={n} onEnquire={() => setSelected(n)} />
               ))}
