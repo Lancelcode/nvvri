@@ -17,6 +17,8 @@ model Nursery {
   price       Int
   hours       String
   ageRange    String
+  minAge      Float    @default(0)
+  maxAge      Float    @default(5)
   rating      Float
   reviews     Int
   spaces      Int

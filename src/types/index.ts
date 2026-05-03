@@ -1,7 +1,7 @@
 export type OfstedRating = "Outstanding" | "Good" | "Requires Improvement";
 
 export interface Nursery {
-  id: number;
+  id: string;
   name: string;
   area: string;
   postcode: string;
@@ -16,6 +16,8 @@ export interface Nursery {
   ofsted: OfstedRating;
   hours: string;
   description: string;
+  lat?: number | null;
+  lng?: number | null;
 }
 
 export interface EnquiryForm {
@@ -39,6 +41,6 @@ export interface AIFilters {
   maxPrice: number | null;
   availFilter: "available" | "waitlist" | "any";
   tags: string[];
-  nameSearch: string | null;   // free-text match on name + area + description
+  nameSearch: string | null;
   explanation: string;
 }
