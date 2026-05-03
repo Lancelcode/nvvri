@@ -11,11 +11,13 @@ interface Props {
 export function NurseryMap({ nurseries, onEnquire }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<import("leaflet").Map | null>(null);
+  const onEnquireRef = useRef(onEnquire);
+
+  useEffect(() => { onEnquireRef.current = onEnquire; }, [onEnquire]);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
-    // Leaflet must be imported client-side only
     import("leaflet").then((L) => {
       // Fix default marker icons broken by webpack
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -34,7 +36,6 @@ export function NurseryMap({ nurseries, onEnquire }: Props) {
         maxZoom: 18,
       }).addTo(map);
 
-      // Custom green marker
       const greenIcon = L.divIcon({
         className: "",
         html: `<div style="
@@ -73,10 +74,9 @@ export function NurseryMap({ nurseries, onEnquire }: Props) {
           .addTo(map);
       });
 
-      // Bridge from popup button click to React
       (window as Window & { nvvriEnquire?: (id: string) => void }).nvvriEnquire = (id: string) => {
         const nursery = nurseries.find((n) => String(n.id) === id);
-        if (nursery) onEnquire(nursery);
+        if (nursery) onEnquireRef.current(nursery);
       };
     });
 
@@ -84,19 +84,12 @@ export function NurseryMap({ nurseries, onEnquire }: Props) {
       mapRef.current?.remove();
       mapRef.current = null;
     };
-  }, [nurseries, onEnquire]);
+  }, [nurseries]);
 
   return (
     <>
-      {/* Leaflet CSS */}
-      <link
-        rel="stylesheet"
-        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-      />
-      <div
-        ref={containerRef}
-        style={{ width: "100%", height: "100%", borderRadius: 12 }}
-      />
+      <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+      <div ref={containerRef} style={{ width: "100%", height: "100%", borderRadius: 12 }} />
     </>
   );
 }
