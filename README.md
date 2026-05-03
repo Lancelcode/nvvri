@@ -72,7 +72,7 @@ Instead of dropdowns, parents type what they actually mean:
 "6 month old, around £55 a day"
 ```
 
-The AI route sends the query to OpenRouter with a strict JSON schema. If the AI call fails or times out, the local parser (`src/lib/aiSearch.ts`) handles intent resolution client-side — no API key required, instant, offline-capable.
+The AI route sends the query to OpenRouter with a strict JSON schema. If the AI call fails or times out, the local parser (`src/lib/aiSearch.ts`) handles intent resolution client-side, no API key required, instant, offline-capable.
 
 | What it resolves | How |
 |---|---|
@@ -153,7 +153,7 @@ To enable AI search, add your OpenRouter key to `.env.local`:
 OPENROUTER_API_KEY=your_key_here
 ```
 
-Get a free key (no credit card) at [openrouter.ai](https://openrouter.ai). Without a key, the local parser handles all search — the app works fully offline.
+Get a free key (no credit card) at [openrouter.ai](https://openrouter.ai). Without a key, the local parser handles all search, the app works fully offline.
 
 ---
 
