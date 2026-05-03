@@ -157,9 +157,9 @@ Get a free key (no credit card) at [openrouter.ai](https://openrouter.ai). Witho
 
 ---
 
-## `$ deploy --one-click`
+## `$ open --live`
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/Lancelcode/nvvri)
+Live at [nvvri.vercel.app](https://nvvri.vercel.app)
 
 ---
 
