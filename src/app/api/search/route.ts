@@ -33,6 +33,13 @@ The "explanation" field: short human-readable summary e.g. "Outstanding nurserie
 The "nameSearch" field: any free-text keywords that don't map to structured filters.
 If nothing matches a field use null or empty array or "any".`;
 
+const MODELS = [
+  "meta-llama/llama-3.3-70b-instruct:free",
+  "mistralai/mistral-7b-instruct:free",
+  "google/gemma-3-12b-it:free",
+  "openrouter/auto",
+];
+
 export async function POST(req: NextRequest) {
   const { query } = await req.json();
 
@@ -45,49 +52,54 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No API key configured" }, { status: 501 });
   }
 
-  try {
-    const response = await fetch(
-      "https://openrouter.ai/api/v1/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model: "meta-llama/llama-3.3-70b-instruct:free",
-          max_tokens: 512,
-          temperature: 0,
-          messages: [
-            { role: "system", content: SYSTEM_PROMPT },
-            { role: "user", content: query },
-          ],
-        }),
-        signal: AbortSignal.timeout(15000),
-      }
-    );
+  let lastError = "";
 
-    if (!response.ok) {
-      const errorBody = await response.json().catch(() => ({ raw: "could not parse" }));
-      console.error("OpenRouter error:", JSON.stringify(errorBody));
-      return NextResponse.json(
-        { error: "OpenRouter request failed", status: response.status, detail: errorBody },
-        { status: 502 }
+  for (const model of MODELS) {
+    try {
+      const response = await fetch(
+        "https://openrouter.ai/api/v1/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model,
+            max_tokens: 512,
+            temperature: 0,
+            messages: [
+              { role: "system", content: SYSTEM_PROMPT },
+              { role: "user", content: query },
+            ],
+          }),
+          signal: AbortSignal.timeout(10000),
+        }
       );
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        lastError = JSON.stringify(err);
+        console.warn(`Model ${model} failed:`, lastError);
+        continue;
+      }
+
+      const data = await response.json();
+      const text: string = data.choices?.[0]?.message?.content ?? "";
+      const cleaned = text.replace(/```(?:json)?/gi, "").trim();
+      const filters: AIFilters = JSON.parse(cleaned);
+
+      return NextResponse.json(filters);
+
+    } catch (err) {
+      lastError = err instanceof Error ? err.message : String(err);
+      console.warn(`Model ${model} threw:`, lastError);
+      continue;
     }
-
-    const data = await response.json();
-    const text: string = data.choices?.[0]?.message?.content ?? "";
-    const cleaned = text.replace(/```(?:json)?/gi, "").trim();
-    const filters: AIFilters = JSON.parse(cleaned);
-
-    return NextResponse.json(filters);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error("OpenRouter search error:", message);
-    return NextResponse.json(
-      { error: "AI search unavailable", detail: message },
-      { status: 503 }
-    );
   }
+
+  return NextResponse.json(
+    { error: "All models failed", detail: lastError },
+    { status: 502 }
+  );
 }
