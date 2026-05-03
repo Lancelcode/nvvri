@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { NurseryCard } from "@/components/NurseryCard";
 import { EnquiryModal } from "@/components/EnquiryModal";
 import { ThinkingIndicator } from "@/components/ThinkingIndicator";
@@ -8,6 +9,12 @@ import { filterNurseries, filterByAI, sortNurseries } from "@/lib/data";
 import { parseQuery } from "@/lib/aiSearch";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import type { Nursery, AgeFilter, AvailFilter, AIFilters, SortOption } from "@/types";
+
+// Leaflet must be loaded client-side only — no SSR
+const NurseryMap = dynamic(
+  () => import("@/components/NurseryMap").then((m) => m.NurseryMap),
+  { ssr: false, loading: () => <div style={{ height: "100%", background: "#f1f5f9", borderRadius: 12 }} /> }
+);
 
 async function smartSearch(query: string): Promise<{ filters: AIFilters; usedAI: boolean }> {
   try {
@@ -27,9 +34,12 @@ async function smartSearch(query: string): Promise<{ filters: AIFilters; usedAI:
   }
 }
 
+type ViewMode = "list" | "map";
+
 export default function HomePage() {
   const [nurseries, setNurseries]     = useState<Nursery[]>([]);
   const [loading, setLoading]         = useState(true);
+  const [viewMode, setViewMode]       = useState<ViewMode>("list");
 
   const [search, setSearch]           = useState("");
   const [maxPrice, setMaxPrice]       = useState(70);
@@ -46,14 +56,10 @@ export default function HomePage() {
   const inputRef = useRef<HTMLInputElement>(null);
   const isMobile = useIsMobile();
 
-  // Fetch nurseries from database on mount
   useEffect(() => {
     fetch("/api/nurseries")
       .then((res) => res.json())
-      .then((data) => {
-        setNurseries(data);
-        setLoading(false);
-      })
+      .then((data) => { setNurseries(data); setLoading(false); })
       .catch(() => setLoading(false));
   }, []);
 
@@ -81,6 +87,30 @@ export default function HomePage() {
     inputRef.current?.focus();
   }
 
+  function ViewToggle() {
+    return (
+      <div style={{
+        display: "flex", background: "#f1f5f9", borderRadius: 8, padding: 3, gap: 2,
+      }}>
+        {(["list", "map"] as ViewMode[]).map((mode) => (
+          <button
+            key={mode}
+            onClick={() => setViewMode(mode)}
+            style={{
+              padding: "5px 14px", borderRadius: 6, border: "none", fontSize: 13,
+              fontWeight: 500, cursor: "pointer", transition: "all 0.15s",
+              background: viewMode === mode ? "white" : "transparent",
+              color: viewMode === mode ? "#0f172a" : "#64748b",
+              boxShadow: viewMode === mode ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
+            }}
+          >
+            {mode === "list" ? "List" : "Map"}
+          </button>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div style={{ minHeight: "100vh", background: "#f8fafc", fontFamily: "system-ui, -apple-system, sans-serif" }}>
       {selected && <EnquiryModal nursery={selected} onClose={() => setSelected(null)} />}
@@ -105,9 +135,7 @@ export default function HomePage() {
           <span style={{ fontWeight: 700, fontSize: 17, color: "#0f172a", letterSpacing: "-0.02em" }}>nvvri</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 8 : 12 }}>
-          {!isMobile && (
-            <span style={{ fontSize: 14, color: "#64748b" }}>For nurseries</span>
-          )}
+          {!isMobile && <span style={{ fontSize: 14, color: "#64748b" }}>For nurseries</span>}
           <button style={{
             background: "#1a7a4a", color: "white", border: "none", borderRadius: 8,
             padding: isMobile ? "7px 12px" : "7px 16px", fontSize: 14, cursor: "pointer", fontWeight: 500,
@@ -203,9 +231,7 @@ export default function HomePage() {
           }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", minWidth: 0 }}>
               <span style={{ fontSize: 13 }}>✦</span>
-              <span style={{ fontSize: 14, color: "#15803d", fontWeight: 500 }}>
-                {aiFilters.explanation}
-              </span>
+              <span style={{ fontSize: 14, color: "#15803d", fontWeight: 500 }}>{aiFilters.explanation}</span>
               <span style={{ fontSize: 13, color: "#94a3b8" }}>
                 · {filtered.length} result{filtered.length !== 1 ? "s" : ""}
               </span>
@@ -229,7 +255,7 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* Filters + sort */}
+        {/* Filters + sort + view toggle */}
         {!aiThinking && !loading && (
           <div style={{
             display: "flex", flexWrap: "wrap", gap: isMobile ? 8 : 12,
@@ -272,27 +298,36 @@ export default function HomePage() {
               display: "flex", alignItems: "center", gap: 8,
               width: isMobile && !aiFilters ? "100%" : "auto",
             }}>
-              <select value={sort} onChange={(e) => setSort(e.target.value as SortOption)}
-                style={{
-                  padding: "7px 12px", borderRadius: 8, border: "1.5px solid #e2e8f0",
-                  fontSize: 13, background: "white", cursor: "pointer", color: "#0f172a",
-                  flex: isMobile ? 1 : "unset",
-                }}>
-                <option value="rating">Top rated</option>
-                <option value="price-asc">Price low-high</option>
-                <option value="price-desc">Price high-low</option>
-                <option value="spaces">Most spaces</option>
-              </select>
+              {viewMode === "list" && (
+                <select value={sort} onChange={(e) => setSort(e.target.value as SortOption)}
+                  style={{
+                    padding: "7px 12px", borderRadius: 8, border: "1.5px solid #e2e8f0",
+                    fontSize: 13, background: "white", cursor: "pointer", color: "#0f172a",
+                    flex: isMobile ? 1 : "unset",
+                  }}>
+                  <option value="rating">Top rated</option>
+                  <option value="price-asc">Price low-high</option>
+                  <option value="price-desc">Price high-low</option>
+                  <option value="spaces">Most spaces</option>
+                </select>
+              )}
               <span style={{ fontSize: 13, color: "#94a3b8", whiteSpace: "nowrap" }}>
                 {filtered.length} {filtered.length !== 1 ? "nurseries" : "nursery"}
               </span>
+              <div style={{ marginLeft: "auto" }}>
+                <ViewToggle />
+              </div>
             </div>
           </div>
         )}
 
-        {/* Grid */}
+        {/* List or Map */}
         {!aiThinking && !loading && (
-          filtered.length === 0 ? (
+          viewMode === "map" ? (
+            <div style={{ height: isMobile ? "60vh" : "70vh", borderRadius: 12, overflow: "hidden", border: "1px solid #e2e8f0" }}>
+              <NurseryMap nurseries={filtered} onEnquire={(n) => setSelected(n)} />
+            </div>
+          ) : filtered.length === 0 ? (
             <div style={{ textAlign: "center", padding: "60px 0", color: "#94a3b8" }}>
               <p style={{ fontSize: 16, marginBottom: 8 }}>No nurseries match your search.</p>
               {aiFilters && (

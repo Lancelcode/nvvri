@@ -2,7 +2,7 @@ import type { Nursery, AIFilters, SortOption } from "@/types";
 
 export const nurseries: Nursery[] = [
   {
-    id: 1,
+    id: "1",
     name: "Meadowside Nursery",
     area: "Morningside",
     postcode: "EH10 4BX",
@@ -20,7 +20,7 @@ export const nurseries: Nursery[] = [
       "Award-winning nursery with forest school sessions and a dedicated baby room. Edinburgh's highest-rated setting for under-2s.",
   },
   {
-    id: 2,
+    id: "2",
     name: "Little Scholars",
     area: "Leith",
     postcode: "EH6 8DB",
@@ -38,7 +38,7 @@ export const nurseries: Nursery[] = [
       "Bilingual English/French setting with dedicated STEM play zones. Currently at capacity — join the waitlist.",
   },
   {
-    id: 3,
+    id: "3",
     name: "Bumblebee Day Nursery",
     area: "Bruntsfield",
     postcode: "EH10 4HR",
@@ -56,7 +56,7 @@ export const nurseries: Nursery[] = [
       "Intimate, home-from-home setting with a beautiful garden. Specialises in creative arts and natural play.",
   },
   {
-    id: 4,
+    id: "4",
     name: "Sunshine Days",
     area: "Newington",
     postcode: "EH9 1QH",
@@ -74,7 +74,7 @@ export const nurseries: Nursery[] = [
       "Flexible sessions with early start options. Accepts funded hours for 3–4 year olds. Multiple spaces available.",
   },
   {
-    id: 5,
+    id: "5",
     name: "Little Explorers",
     area: "Stockbridge",
     postcode: "EH3 5NE",
@@ -92,7 +92,7 @@ export const nurseries: Nursery[] = [
       "Edinburgh's only nursery with weekly parent yoga sessions. Nature-based curriculum with regular trips to Inverleith Park.",
   },
   {
-    id: 6,
+    id: "6",
     name: "Bright Futures",
     area: "Corstorphine",
     postcode: "EH12 7AA",
