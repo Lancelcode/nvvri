@@ -10,7 +10,7 @@ Available tags: "Outdoor Learning", "Nursery School", "Bilingual", "STEM Focus",
 
 Age rules:
 - baby/infant/newborn/under 1 = minAge: 0, maxAge: 0.9
-- toddler/1-2 years = minAge: 1, maxAge: 2.9  
+- toddler/1-2 years = minAge: 1, maxAge: 2.9
 - preschool/3-5 years = minAge: 3, maxAge: 5
 - X months old: convert to years (e.g. 6 months = 0.5)
 
@@ -30,7 +30,7 @@ Return exactly this JSON shape:
 }
 
 The "explanation" field: short human-readable summary e.g. "Outstanding nurseries in Leith for babies with outdoor learning".
-The "nameSearch" field: any free-text keywords that don't map to structured filters (e.g. nursery name fragments like "meadow", "bumblebee").
+The "nameSearch" field: any free-text keywords that don't map to structured filters.
 If nothing matches a field use null or empty array or "any".`;
 
 export async function POST(req: NextRequest) {
@@ -54,30 +54,34 @@ export async function POST(req: NextRequest) {
         body: JSON.stringify({
           system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
           contents: [{ parts: [{ text: query }] }],
-          generationConfig: {
-            temperature: 0,        // deterministic — we want structured output not creativity
-            maxOutputTokens: 512,
-          },
+          generationConfig: { temperature: 0, maxOutputTokens: 512 },
         }),
-        signal: AbortSignal.timeout(4000), // 4s timeout — fall back to local parser if slow
+        signal: AbortSignal.timeout(8000),
       }
     );
 
     if (!response.ok) {
-      return NextResponse.json({ error: "Gemini request failed" }, { status: 502 });
+      // Expose the real Gemini error so we can debug
+      const errorBody = await response.json().catch(() => ({ raw: "could not parse" }));
+      console.error("Gemini error:", JSON.stringify(errorBody));
+      return NextResponse.json(
+        { error: "Gemini request failed", geminiStatus: response.status, detail: errorBody },
+        { status: 502 }
+      );
     }
 
     const data = await response.json();
     const text: string = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-
-    // Strip any markdown fences Gemini might add despite instructions
     const cleaned = text.replace(/```(?:json)?/gi, "").trim();
     const filters: AIFilters = JSON.parse(cleaned);
 
     return NextResponse.json(filters);
   } catch (err) {
-    // Any failure — timeout, parse error, network — signals the client to fall back
-    console.error("Gemini search error:", err);
-    return NextResponse.json({ error: "AI search unavailable" }, { status: 503 });
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("Gemini search error:", message);
+    return NextResponse.json(
+      { error: "AI search unavailable", detail: message },
+      { status: 503 }
+    );
   }
 }
