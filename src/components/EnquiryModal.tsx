@@ -49,9 +49,9 @@ export function EnquiryModal({ nursery, onClose }: Props) {
   const [form, setForm]             = useState<EnquiryForm>({ name: "", email: "", phone: "", childDob: "", startDate: "", message: "" });
   const [errors, setErrors]         = useState<FormErrors>({});
   const [submitting, setSubmitting] = useState(false);
+  const [sendError, setSendError]   = useState<string | null>(null);
   const isMobile = useIsMobile();
 
-  // ESC to close
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
@@ -71,11 +71,31 @@ export function EnquiryModal({ nursery, onClose }: Props) {
     setStep(2);
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     const errs = validateStep2(form);
     if (Object.keys(errs).length > 0) { setErrors(errs); return; }
+
     setSubmitting(true);
-    setTimeout(() => setStep(3), 900);
+    setSendError(null);
+
+    try {
+      const res = await fetch("/api/enquiry", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nurseryName: nursery.name,
+          nurseryArea: nursery.area,
+          ...form,
+        }),
+      });
+
+      if (!res.ok) throw new Error("Send failed");
+      setStep(3);
+    } catch {
+      setSendError("Something went wrong. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -94,7 +114,6 @@ export function EnquiryModal({ nursery, onClose }: Props) {
         padding: isMobile ? "24px 20px" : 28,
         border: "1px solid #e2e8f0",
         boxShadow: "0 20px 60px rgba(0,0,0,0.15)",
-        // On mobile, allow scroll if content is tall
         maxHeight: isMobile ? "92vh" : "auto",
         overflowY: isMobile ? "auto" : "visible",
       }}>
@@ -112,7 +131,7 @@ export function EnquiryModal({ nursery, onClose }: Props) {
               Enquiry sent
             </p>
             <p style={{ fontSize: 14, color: "#64748b", marginBottom: 24, lineHeight: 1.6 }}>
-              {nursery.name} will be in touch within 24 hours.
+              We sent a confirmation to <strong>{form.email}</strong>. {nursery.name} will be in touch within 24 hours.
             </p>
             <button onClick={onClose} style={{
               background: "#1a7a4a", color: "white", border: "none", borderRadius: 8,
@@ -123,7 +142,6 @@ export function EnquiryModal({ nursery, onClose }: Props) {
           </div>
         ) : (
           <>
-            {/* Header */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
               <div>
                 <p style={{ fontSize: 16, fontWeight: 600, color: "#0f172a", margin: 0 }}>
@@ -139,7 +157,6 @@ export function EnquiryModal({ nursery, onClose }: Props) {
               }}>×</button>
             </div>
 
-            {/* Step indicator */}
             <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
               {(["Your details", "Child details"] as const).map((label, i) => (
                 <div key={label} style={{ flex: 1, display: "flex", alignItems: "center", gap: 6 }}>
@@ -218,8 +235,15 @@ export function EnquiryModal({ nursery, onClose }: Props) {
                     placeholder="Any questions or specific requirements..." rows={3}
                     style={{ ...inputStyle, resize: "none" }} />
                 </div>
+
+                {sendError && (
+                  <p style={{ fontSize: 13, color: "#dc2626", background: "#fff5f5", border: "1px solid #fca5a5", borderRadius: 8, padding: "10px 12px", margin: 0 }}>
+                    {sendError}
+                  </p>
+                )}
+
                 <div style={{ display: "flex", gap: 8 }}>
-                  <button onClick={() => { setErrors({}); setStep(1); }} style={{
+                  <button onClick={() => { setErrors({}); setSendError(null); setStep(1); }} style={{
                     flex: 1, background: "none", border: "1px solid #e2e8f0", borderRadius: 8,
                     padding: "11px 0", fontSize: 14, cursor: "pointer", color: "#0f172a",
                   }}>
