@@ -40,14 +40,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing query" }, { status: 400 });
   }
 
-  const apiKey = process.env.GROQ_API_KEY;
+  const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
     return NextResponse.json({ error: "No API key configured" }, { status: 501 });
   }
 
   try {
     const response = await fetch(
-      "https://api.groq.com/openai/v1/chat/completions",
+      "https://openrouter.ai/api/v1/chat/completions",
       {
         method: "POST",
         headers: {
@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
           "Authorization": `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: "llama-3.1-8b-instant",
+          model: "meta-llama/llama-3.1-8b-instruct:free",
           max_tokens: 512,
           temperature: 0,
           messages: [
@@ -69,9 +69,9 @@ export async function POST(req: NextRequest) {
 
     if (!response.ok) {
       const errorBody = await response.json().catch(() => ({ raw: "could not parse" }));
-      console.error("Groq error:", JSON.stringify(errorBody));
+      console.error("OpenRouter error:", JSON.stringify(errorBody));
       return NextResponse.json(
-        { error: "Groq request failed", groqStatus: response.status, detail: errorBody },
+        { error: "OpenRouter request failed", status: response.status, detail: errorBody },
         { status: 502 }
       );
     }
@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(filters);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error("Groq search error:", message);
+    console.error("OpenRouter search error:", message);
     return NextResponse.json(
       { error: "AI search unavailable", detail: message },
       { status: 503 }
