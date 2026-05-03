@@ -51,7 +51,6 @@ export function EnquiryModal({ nursery, onClose }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const isMobile = useIsMobile();
 
-  // ESC to close
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
@@ -83,7 +82,7 @@ export function EnquiryModal({ nursery, onClose }: Props) {
       style={{
         position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)",
         display: "flex", alignItems: isMobile ? "flex-end" : "center", justifyContent: "center",
-        zIndex: 50, padding: isMobile ? 0 : 16,
+        zIndex: 9999, padding: isMobile ? 0 : 16,
       }}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
@@ -94,7 +93,6 @@ export function EnquiryModal({ nursery, onClose }: Props) {
         padding: isMobile ? "24px 20px" : 28,
         border: "1px solid #e2e8f0",
         boxShadow: "0 20px 60px rgba(0,0,0,0.15)",
-        // On mobile, allow scroll if content is tall
         maxHeight: isMobile ? "92vh" : "auto",
         overflowY: isMobile ? "auto" : "visible",
       }}>
@@ -123,7 +121,6 @@ export function EnquiryModal({ nursery, onClose }: Props) {
           </div>
         ) : (
           <>
-            {/* Header */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
               <div>
                 <p style={{ fontSize: 16, fontWeight: 600, color: "#0f172a", margin: 0 }}>
@@ -139,7 +136,6 @@ export function EnquiryModal({ nursery, onClose }: Props) {
               }}>×</button>
             </div>
 
-            {/* Step indicator */}
             <div style={{ display: "flex", gap: 8, marginBottom: 24 }}>
               {(["Your details", "Child details"] as const).map((label, i) => (
                 <div key={label} style={{ flex: 1, display: "flex", alignItems: "center", gap: 6 }}>
