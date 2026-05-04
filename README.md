@@ -245,6 +245,14 @@ CI runs the same flow on every push to `main`.
 
 ---
 
+## What I learned
+
+- Free-text search is much harder than structured filters
+- AI is unreliable without fallback systems
+- SEO matters as much as product features for marketplaces
+- Handling partial postcodes and fuzzy locations is non-trivial
+
+This section comes last because these insights only became clear after building the system end-to-end.
 
 
 <div align="center">
