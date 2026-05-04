@@ -113,7 +113,7 @@ export default function HomePage() {
 
   return (
     <div style={{ minHeight: "100vh", background: "#f8fafc", fontFamily: "system-ui, -apple-system, sans-serif" }}>
-      {selected && <EnquiryModal nursery={selected} onClose={() => setSelected(null)} />}
+      {selected && <EnquiryModal nursery={selected} onClose={() => { setSelected(null); setSearch(""); clearAISearch(); }} />}
 
       {/* Nav */}
       <nav style={{
