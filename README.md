@@ -223,14 +223,28 @@ npx playwright test           # run E2E suite
 
 CI runs the same flow on every push to `main`.
 
+## Live Demo
+
+`🡇🡇🡇🡇🡇🡇🡇🡇 Click this to see Nvvri on your browser!`
 ---
 
-## `$ open --live`
-
-Live at [nvvri.co.uk](https://nvvri.co.uk)
-GitHub: [github.com/Lancelcode/nvvri](https://github.com/Lancelcode/nvvri)
+[![View Live Site](https://img.shields.io/badge/View-Live%20Site-000?style=for-the-badge&logo=vercel)](https://nvvri.vercel.app/)
 
 ---
+
+## One-Click Deploy
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/import/project?template=https://github.com/Lancelcode/nvvri)
+
+---
+
+## Repository
+
+[![GitHub Repo](https://img.shields.io/badge/GitHub-nvvri-181717?style=for-the-badge&logo=github)](https://github.com/Lancelcode/nvvri)
+
+---
+
+
 
 <div align="center">
 <sub>Built by <a href="https://github.com/Lancelcode">Djiby Sow Rebollo</a> in Edinburgh, Scotland</sub>
