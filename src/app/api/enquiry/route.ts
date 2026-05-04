@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
   try {
     await resend.emails.send({
       from: "nvvri <onboarding@resend.dev>",
-      to: email,
+      to: process.env.CONTACT_EMAIL!,
       subject: `Your enquiry to ${nurseryName}`,
       html: `
         <div style="font-family: system-ui, sans-serif; max-width: 520px; margin: 0 auto; color: #0f172a;">
