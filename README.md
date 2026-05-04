@@ -8,8 +8,9 @@
 ```
 
 <div align="center">
-
-[![Live](https://img.shields.io/badge/Live-nvvri.co.uk-00C7B7?style=for-the-badge&logo=vercel&logoColor=white)](https://nvvri.co.uk)
+  
+[![Live](https://img.shields.io/badge/Live-nvvri.co.uk-00C7B7?style=for-the-badge&logo=vercel&logoColor=white)](https://nvvri.vercel.app/)
+[![Status](https://img.shields.io/badge/status-online-brightgreen?style=for-the-badge)](https://nvvri.vercel.app/)
 [![Next.js](https://img.shields.io/badge/Next.js_15-000000?style=for-the-badge&logo=next.js&logoColor=white)](https://nextjs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript_strict-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![PostgreSQL](https://img.shields.io/badge/Postgres-336791?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org)
