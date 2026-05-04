@@ -208,11 +208,21 @@ export default function HomePage() {
               onChange={(e) => { setSearch(e.target.value); clearAISearch(); }}
               placeholder="Or search by area or postcode — e.g. Leith, EH6"
               style={{
-                width: "100%", padding: "12px 16px 12px 40px", borderRadius: 10,
+                width: "100%", padding: "12px 40px 12px 40px", borderRadius: 10,
                 border: "1.5px solid #e2e8f0", fontSize: 15, background: "white",
                 outline: "none", boxSizing: "border-box", color: "#0f172a",
               }}
             />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                style={{
+                  position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)",
+                  background: "none", border: "none", cursor: "pointer",
+                  color: "#94a3b8", fontSize: 18, lineHeight: 1, padding: 4,
+                }}
+              >×</button>
+            )}
           </div>
         </div>
       </div>
