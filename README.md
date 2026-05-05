@@ -8,9 +8,8 @@
 ```
 
 <div align="center">
-  
-[![Live](https://img.shields.io/badge/Live-nvvri.co.uk-00C7B7?style=for-the-badge&logo=vercel&logoColor=white)](https://nvvri.vercel.app/)
-[![Status](https://img.shields.io/badge/status-online-brightgreen?style=for-the-badge)](https://nvvri.vercel.app/)
+
+[![Live](https://img.shields.io/badge/Live-nvvri.co.uk-00C7B7?style=for-the-badge&logo=vercel&logoColor=white)](https://nvvri.co.uk)
 [![Next.js](https://img.shields.io/badge/Next.js_15-000000?style=for-the-badge&logo=next.js&logoColor=white)](https://nextjs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript_strict-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![PostgreSQL](https://img.shields.io/badge/Postgres-336791?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org)
@@ -224,36 +223,14 @@ npx playwright test           # run E2E suite
 
 CI runs the same flow on every push to `main`.
 
-## Live Demo
-
-`🡇🡇🡇🡇🡇🡇🡇🡇 Click this to see Nvvri on your browser!`
 ---
 
-[![View Live Site](https://img.shields.io/badge/View-Live%20Site-000?style=for-the-badge&logo=vercel)](https://nvvri.vercel.app/)
+## `$ open --live`
+
+Live at [nvvri.co.uk](https://nvvri.co.uk)
+GitHub: [github.com/Lancelcode/nvvri](https://github.com/Lancelcode/nvvri)
 
 ---
-
-## One-Click Deploy
-
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/import/project?template=https://github.com/Lancelcode/nvvri)
-
----
-
-## Repository
-
-[![GitHub Repo](https://img.shields.io/badge/GitHub-nvvri-181717?style=for-the-badge&logo=github)](https://github.com/Lancelcode/nvvri)
-
----
-
-## What I learned
-
-- Free-text search is much harder than structured filters
-- AI is unreliable without fallback systems
-- SEO matters as much as product features for marketplaces
-- Handling partial postcodes and fuzzy locations is non-trivial
-
-This section comes last because these insights only became clear after building the system end-to-end.
-
 
 <div align="center">
 <sub>Built by <a href="https://github.com/Lancelcode">Djiby Sow Rebollo</a> in Edinburgh, Scotland</sub>

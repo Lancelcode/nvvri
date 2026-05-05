@@ -1,10 +1,49 @@
 import { test, expect } from "@playwright/test";
 
+/**
+ * Enquiry flow tests.
+ *
+ * We intercept POST /api/enquiry and return a mock 200 response so that:
+ *   - No Resend emails are sent during CI
+ *   - Tests are deterministic (no network variability from an email provider)
+ *   - The free Resend allowance is not consumed by automated test runs
+ *
+ * The intercepted handler validates that the request body is well-formed,
+ * so we are still testing that the form sends the right payload.
+ */
+
 const TEST_EMAIL = "djibysowrebollo@gmail.com";
 const TEST_PHONE = "1234567890";
 const TEST_MESSAGE = "test message";
-const CHILD_DOB = "2024-01-10"; // 10th Jan
-const START_DATE = "2025-01-20"; // 20th Jan
+const CHILD_DOB = "2024-01-10";
+const START_DATE = "2025-01-20";
+
+async function mockEnquiryRoute(page: import("@playwright/test").Page) {
+  await page.route("**/api/enquiry", async (route) => {
+    const request = route.request();
+
+    // Still validate the shape the form is sending
+    const body = request.postDataJSON() as Record<string, unknown>;
+    const required = ["nurseryName", "nurseryArea", "name", "email", "phone", "childDob", "startDate"];
+    const missing = required.filter((k) => !body[k]);
+
+    if (missing.length > 0) {
+      await route.fulfill({
+        status: 400,
+        contentType: "application/json",
+        body: JSON.stringify({ error: `Missing: ${missing.join(", ")}` }),
+      });
+      return;
+    }
+
+    // All required fields present — simulate a successful send
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ success: true }),
+    });
+  });
+}
 
 async function fillEnquiryForm(page: import("@playwright/test").Page) {
   // Step 1 — personal details
@@ -19,56 +58,75 @@ async function fillEnquiryForm(page: import("@playwright/test").Page) {
   await page.getByPlaceholder("Any questions or specific requirements...").fill(TEST_MESSAGE);
   await page.getByRole("button", { name: "Send enquiry" }).click();
 
-  // Confirm success screen
+  // Success screen
   await expect(page.getByText("Enquiry sent")).toBeVisible({ timeout: 10000 });
 }
 
 test.describe("Enquiry flow", () => {
   test.beforeEach(async ({ page }) => {
+    // Intercept before navigation so no request slips through
+    await mockEnquiryRoute(page);
+
     await page.goto("http://localhost:3000");
-    // Wait for nurseries to load
-    await expect(page.locator("text=Meadowside Nursery")).toBeVisible({ timeout: 10000 });
+    await expect(page.locator("text=Meadowside Nursery")).toBeVisible({
+      timeout: 10000,
+    });
   });
 
   test("enquiry from list view", async ({ page }) => {
-    // Click Enquire on the first nursery card
     await page.getByRole("button", { name: "Enquire" }).first().click();
-
-    // Modal should open
     await expect(page.getByText("Enquire at")).toBeVisible();
 
     await fillEnquiryForm(page);
 
-    // Close modal
     await page.getByRole("button", { name: "Done" }).click();
-
-    // Should be back on main page showing nurseries
     await expect(page.locator("text=Meadowside Nursery")).toBeVisible();
   });
 
   test("enquiry from map view", async ({ page }) => {
-    // Switch to map view
     await page.getByRole("button", { name: "Map" }).click();
-
-    // Wait for map to load
     await page.waitForTimeout(2000);
 
-    // Click a marker — Leaflet markers are divs inside the map
     const marker = page.locator(".leaflet-marker-icon").first();
     await marker.click();
-
-    // Wait for popup
     await page.waitForTimeout(500);
 
-    // Click Enquire in the popup
     await page.locator(".leaflet-popup button", { hasText: "Enquire" }).click();
-
-    // Modal should open
     await expect(page.getByText("Enquire at")).toBeVisible();
 
     await fillEnquiryForm(page);
-
-    // Close modal
     await page.getByRole("button", { name: "Done" }).click();
+  });
+
+  test("validation rejects an empty name", async ({ page }) => {
+    await page.getByRole("button", { name: "Enquire" }).first().click();
+    await expect(page.getByText("Enquire at")).toBeVisible();
+
+    // Skip name, fill phone and email, try to continue
+    await page.getByPlaceholder("07700 900000").fill(TEST_PHONE);
+    await page.getByPlaceholder("you@example.com").fill(TEST_EMAIL);
+    await page.getByRole("button", { name: "Continue" }).click();
+
+    // Should show inline error, not advance to step 2
+    await expect(page.getByText("Name is required")).toBeVisible();
+    await expect(page.getByText("Child date of birth")).not.toBeVisible();
+  });
+
+  test("validation rejects a malformed email", async ({ page }) => {
+    await page.getByRole("button", { name: "Enquire" }).first().click();
+
+    await page.getByPlaceholder("Your name").fill("Test User");
+    await page.getByPlaceholder("07700 900000").fill(TEST_PHONE);
+    await page.getByPlaceholder("you@example.com").fill("not-an-email");
+    await page.getByRole("button", { name: "Continue" }).click();
+
+    await expect(page.getByText("Enter a valid email")).toBeVisible();
+  });
+
+  test("ESC closes the modal", async ({ page }) => {
+    await page.getByRole("button", { name: "Enquire" }).first().click();
+    await expect(page.getByText("Enquire at")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByText("Enquire at")).not.toBeVisible();
   });
 });
