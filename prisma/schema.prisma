@@ -28,3 +28,23 @@ model Nursery {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
+
+/// Records every AI search request hitting /api/search.
+/// Powers the analytics dashboard at /admin/searches.
+///
+/// `model` is the model that successfully served the request, or null if all
+/// models failed (in which case the client falls back to the local parser).
+/// `latencyMs` is server-side time only, including model retries.
+model SearchLog {
+  id          String   @id @default(cuid())
+  query       String
+  model       String?
+  success     Boolean
+  latencyMs   Int
+  errorDetail String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([model])
+}
