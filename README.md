@@ -9,10 +9,11 @@
 
 <div align="center">
 
-[![Live Demo](https://img.shields.io/badge/Live_Demo-nvvri.vercel.app-00C7B7?style=for-the-badge&logo=vercel&logoColor=white)](https://nvvri.vercel.app)
+[![Live](https://img.shields.io/badge/Live-nvvri.co.uk-00C7B7?style=for-the-badge&logo=vercel&logoColor=white)](https://nvvri.co.uk)
 [![Next.js](https://img.shields.io/badge/Next.js_15-000000?style=for-the-badge&logo=next.js&logoColor=white)](https://nextjs.org)
-[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
-[![React](https://img.shields.io/badge/React_19-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev)
+[![TypeScript](https://img.shields.io/badge/TypeScript_strict-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![PostgreSQL](https://img.shields.io/badge/Postgres-336791?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org)
+[![Tests](https://img.shields.io/badge/E2E-Playwright-2EAD33?style=for-the-badge&logo=playwright&logoColor=white)](https://playwright.dev)
 
 </div>
 
@@ -20,22 +21,26 @@
 
 ## `$ cat problem.txt`
 
-Finding a nursery in the UK is surprisingly broken. Parents search across five different sites, call nurseries individually, and still cannot easily compare Ofsted ratings, fees, and availability in one place.
+Finding a nursery in the UK is broken. Parents stitch together five different sites, ring nurseries one at a time, and still cannot easily compare Ofsted ratings, fees, and availability in one place.
 
-nvvri is a proof of concept for what that experience should look like. Built to understand the problem space
+nvvri is a working proof of concept for what that experience should look like, built end-to-end to understand the problem space.
 
 ---
 
-## `$ cat about.txt`
+## `$ cat stack.txt`
 
 ```json
 {
-  "framework"  : "Next.js 15 (App Router, Turbopack)",
-  "language"   : "TypeScript — strict mode, zero any",
-  "ui"         : "React 19 — client-side state and interactivity",
-  "styling"    : "Inline styles only — no Tailwind, no CSS frameworks",
-  "ai"         : "OpenRouter — multi-model fallback chain (Llama, Mistral, Gemma)",
-  "deployment" : "Vercel"
+  "framework"  : "Next.js 15 (App Router, Turbopack, RSC)",
+  "language"   : "TypeScript, strict mode, zero any",
+  "ui"         : "React 19, inline styles only, no Tailwind, no CSS frameworks",
+  "database"   : "Neon (PostgreSQL) + Prisma v5",
+  "ai"         : "OpenRouter, multi-model fallback chain",
+  "email"      : "Resend, verified domain nvvri.co.uk",
+  "maps"       : "Leaflet + OpenStreetMap",
+  "tests"      : "Playwright E2E, runs in CI",
+  "deployment" : "Vercel",
+  "domain"     : "nvvri.co.uk"
 }
 ```
 
@@ -47,15 +52,17 @@ The no-Tailwind constraint was intentional. Inline styles force you to think abo
 
 | Feature | Description |
 |---|---|
-| AI natural language search | Intent parser resolves area, age, Ofsted, price, tags, and availability from free text |
-| Multi-model fallback chain | Tries Llama 3.3 → Mistral 7B → Gemma 3 → auto-router before falling back to local parser |
-| Local parser fallback | Client-side regex parser — search always works, even if every AI model is down |
-| Postcode resolution | Full postcodes, district prefixes, and inward codes all resolve to the correct area |
-| Manual filters | Price slider, age group, and availability for users who prefer structured search |
-| Sort | By rating, price (low/high), or spaces available |
-| Nursery cards | Ofsted badge with colour coding, fees, hours, age range, tags |
-| Two-step enquiry flow | Field validation, inline error states, ESC-to-close |
-| Thinking animation | Cycling messages that simulate AI processing latency |
+| AI natural language search | Free-text queries parsed into structured filters by an LLM |
+| Multi-model fallback chain | Llama 3.3 -> Mistral 7B -> Gemma 3 -> openrouter/auto -> local parser |
+| Local parser fallback | Regex parser. Search works even if every AI model is down |
+| Postcode resolution | Full postcodes, district prefixes, and inward codes all resolve |
+| Per-nursery SEO pages | Server-rendered, JSON-LD `Preschool` schema, dynamic sitemap |
+| AI answer card | Zero-click summary at the top of results |
+| Map view | Leaflet + OSM, custom markers, popup with enquire CTA |
+| Real enquiry backend | Resend sends two emails (parent confirmation + admin notification) |
+| Mobile responsive | Bottom-sheet modal, single-column grid, adaptive nav |
+| Two-step enquiry flow | Field validation, inline errors, ESC-to-close |
+| E2E tests | Playwright covers list and map enquiry flows, runs in CI |
 
 ---
 
@@ -77,25 +84,39 @@ The AI route sends the query to OpenRouter with a strict JSON schema. If the AI 
 | What it resolves | How |
 |---|---|
 | Area by name | Word-boundary regex against known areas |
-| Area by postcode | Full postcode, district prefix, inward code — all handled |
-| Area by partial name | "mornings" → Morningside, "stock" → Stockbridge |
+| Area by postcode | Full postcode, district prefix, inward code |
+| Area by partial name | "mornings" -> Morningside, "stock" -> Stockbridge |
 | Age group | Weeks, months, years, baby/toddler/preschool keywords |
-| Price ceiling | Ranges, "around £X", "under £X", "cheap" — with semantics |
+| Price ceiling | Ranges, "around £X", "under £X", "cheap" |
 | Ofsted rating | Outstanding, Good, Requires Improvement |
 | Availability | Spaces available, waitlist |
-| Specialist tags | Outdoor, bilingual, STEM, funded places, yoga, and more |
+| Specialist tags | Outdoor, bilingual, STEM, funded, yoga, and more |
 
 The AI fallback chain tries four models in order before giving up:
 
 ```
 meta-llama/llama-3.3-70b-instruct:free
-  → mistralai/mistral-7b-instruct:free
-    → google/gemma-3-12b-it:free
-      → openrouter/auto
-        → local parser (always works)
+  -> mistralai/mistral-7b-instruct:free
+    -> google/gemma-3-12b-it:free
+      -> openrouter/auto
+        -> local parser (always works)
 ```
 
 The user never sees a failure state.
+
+---
+
+## `$ cat seo.txt`
+
+Directory sites live and die by search. nvvri is built so Google sees everything a parent does.
+
+* Home page is a server component, nurseries fetched at request time, hydrated with full content in the initial HTML
+* Each nursery has its own statically generated page at `/nursery/[slug]`
+* Per-page metadata: titles, descriptions, Open Graph, Twitter cards
+* JSON-LD structured data using the `Preschool` schema, with `aggregateRating`, `address`, `geo`, `openingHours`, and `priceRange`
+* Dynamic `sitemap.xml` generated from the database
+* `robots.txt` allows full crawl and points to the sitemap
+* ISR with 60s revalidation keeps content fresh without rebuilds
 
 ---
 
@@ -104,34 +125,73 @@ The user never sees a failure state.
 ```
 src/
 ├── app/
-│   ├── api/search/route.ts     # OpenRouter multi-model fallback route
-│   └── page.tsx                # Main view — AI search + filters + results
+│   ├── api/
+│   │   ├── enquiry/route.ts     # Resend two-email flow
+│   │   ├── nurseries/route.ts   # GET nurseries from DB
+│   │   └── search/route.ts      # OpenRouter multi-model fallback
+│   ├── nursery/[slug]/
+│   │   ├── page.tsx             # Server-rendered nursery detail + JSON-LD
+│   │   └── not-found.tsx        # 404 for unknown slugs
+│   ├── layout.tsx               # Root metadata, OG, Twitter
+│   ├── page.tsx                 # Server component, fetches and renders
+│   ├── sitemap.ts               # Dynamic sitemap from DB
+│   ├── robots.ts                # Crawl rules
+│   ├── loading.tsx              # Root loading state
+│   └── not-found.tsx            # Global 404
 ├── components/
-│   ├── NurseryCard.tsx         # Card with Ofsted badge logic
-│   ├── EnquiryModal.tsx        # Two-step form with validation and ESC-to-close
-│   └── ThinkingIndicator.tsx   # AI loading animation
+│   ├── HomeClient.tsx           # Client interactivity, takes nurseries as prop
+│   ├── NurseryCard.tsx          # Card with Ofsted badge logic
+│   ├── NurseryMap.tsx           # Leaflet map, custom markers, popup
+│   ├── EnquiryModal.tsx         # Two-step form, validation, ESC-close
+│   ├── ThinkingIndicator.tsx    # AI loading animation
+│   ├── AnswerCard.tsx           # Zero-click AI summary above results
+│   └── NurseryActions.tsx       # Client island for the enquire CTA on detail pages
+├── hooks/
+│   └── useIsMobile.ts           # Responsive breakpoint hook
 ├── lib/
-│   ├── aiSearch.ts             # Natural language intent parser (local, no API)
-│   └── data.ts                 # Nursery data, filter, and sort logic
+│   ├── prisma.ts                # Prisma singleton
+│   ├── aiSearch.ts              # Local intent parser (no API)
+│   ├── data.ts                  # Filter and sort helpers
+│   ├── slug.ts                  # Stable slug generation
+│   └── seo.ts                   # JSON-LD builder
 └── types/
-    └── index.ts                # Shared types across the app
+    └── index.ts                 # Shared types
 ```
+
+---
+
+## `$ cat env.txt`
+
+Set these in `.env.local` for development and in Vercel for production:
+
+```
+DATABASE_URL          # Neon Postgres connection string
+RESEND_API_KEY        # Resend API key
+CONTACT_EMAIL         # Where admin enquiry notifications land
+OPENROUTER_API_KEY    # OpenRouter key for AI search (free tier works)
+NEXT_PUBLIC_SITE_URL  # Public origin, e.g. https://nvvri.co.uk
+```
+
+Without `OPENROUTER_API_KEY` the local parser handles every search. Without `RESEND_API_KEY` the enquiry flow returns 500. Other vars are required.
 
 ---
 
 ## `$ cat roadmap.log`
 
 ```
-[done] ████████████████████  AI intent parser       — area, age, price, tags, Ofsted
-[done] ████████████████████  Multi-model fallback   — 4 models + local parser safety net
-[done] ████████████████████  Nursery cards          — Ofsted badge, fees, hours, tags
-[done] ████████████████████  Enquiry flow           — two-step form, validation, ESC-close
-[done] ████████████████████  Thinking animation     — simulates real LLM latency
-[next] ░░░░░░░░░░░░░░░░░░░░  PostgreSQL + Prisma    — replace mock data with real nurseries
-[next] ░░░░░░░░░░░░░░░░░░░░  Real enquiry backend   — email delivery via Resend or Postmark
-[next] ░░░░░░░░░░░░░░░░░░░░  Mobile responsive UI   — optimise for parent on the go
-[next] ░░░░░░░░░░░░░░░░░░░░  Map view               — nursery locations on an interactive map
-[next] ░░░░░░░░░░░░░░░░░░░░  Parent auth            — saved shortlists and comparison
+[done] ████████████████████  AI intent parser            Area, age, price, tags, Ofsted
+[done] ████████████████████  Multi-model fallback        4 models + local parser safety net
+[done] ████████████████████  PostgreSQL + Prisma         Neon, 6 nurseries seeded with lat/lng
+[done] ████████████████████  Real enquiry backend        Resend, parent + admin emails
+[done] ████████████████████  Mobile responsive UI        Bottom sheet, single column, adaptive nav
+[done] ████████████████████  Map view                    Leaflet, custom markers, popup CTA
+[done] ████████████████████  Playwright E2E              List and map flows, runs in CI
+[done] ████████████████████  SEO foundation              SSR, sitemap, robots, JSON-LD
+[done] ████████████████████  AI answer card              Zero-click summary above results
+[next] ░░░░░░░░░░░░░░░░░░░░  Parent auth                 Shortlists and saved nurseries
+[next] ░░░░░░░░░░░░░░░░░░░░  Compare nurseries           Side-by-side comparison
+[next] ░░░░░░░░░░░░░░░░░░░░  Search analytics            Log queries, track model success rates
+[next] ░░░░░░░░░░░░░░░░░░░░  Nursery admin portal        For nurseries to manage their listing
 ```
 
 ---
@@ -142,27 +202,36 @@ src/
 git clone https://github.com/Lancelcode/nvvri.git
 cd nvvri
 npm install
+cp .env.example .env.local   # fill in values
+npx prisma migrate deploy    # apply schema
+npx prisma db seed           # seed 6 nurseries
 npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
 
-To enable AI search, add your OpenRouter key to `.env.local`:
+---
 
-```
-OPENROUTER_API_KEY=your_key_here
+## `$ npm test`
+
+```bash
+npx playwright install        # one-time browser install
+npm run build                 # build the app
+npm start &                   # serve on :3000
+npx playwright test           # run E2E suite
 ```
 
-Get a free key (no credit card) at [openrouter.ai](https://openrouter.ai). Without a key, the local parser handles all search, the app works fully offline.
+CI runs the same flow on every push to `main`.
 
 ---
 
 ## `$ open --live`
 
-Live at [nvvri.vercel.app](https://nvvri.vercel.app)
+Live at [nvvri.co.uk](https://nvvri.co.uk)
+GitHub: [github.com/Lancelcode/nvvri](https://github.com/Lancelcode/nvvri)
 
 ---
 
 <div align="center">
-<sub>Built by <a href="https://github.com/Lancelcode">Djiby Sow Rebollo</a> · Edinburgh, Scotland</sub>
+<sub>Built by <a href="https://github.com/Lancelcode">Djiby Sow Rebollo</a> in Edinburgh, Scotland</sub>
 </div>
