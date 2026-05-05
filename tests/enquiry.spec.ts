@@ -21,8 +21,6 @@ const START_DATE = "2025-01-20";
 async function mockEnquiryRoute(page: import("@playwright/test").Page) {
   await page.route("**/api/enquiry", async (route) => {
     const request = route.request();
-
-    // Still validate the shape the form is sending
     const body = request.postDataJSON() as Record<string, unknown>;
     const required = ["nurseryName", "nurseryArea", "name", "email", "phone", "childDob", "startDate"];
     const missing = required.filter((k) => !body[k]);
@@ -36,7 +34,6 @@ async function mockEnquiryRoute(page: import("@playwright/test").Page) {
       return;
     }
 
-    // All required fields present — simulate a successful send
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -46,31 +43,24 @@ async function mockEnquiryRoute(page: import("@playwright/test").Page) {
 }
 
 async function fillEnquiryForm(page: import("@playwright/test").Page) {
-  // Step 1 — personal details
   await page.getByPlaceholder("Your name").fill("Djiby Test");
   await page.getByPlaceholder("07700 900000").fill(TEST_PHONE);
   await page.getByPlaceholder("you@example.com").fill(TEST_EMAIL);
   await page.getByRole("button", { name: "Continue" }).click();
 
-  // Step 2 — child details
   await page.locator('input[type="date"]').first().fill(CHILD_DOB);
   await page.locator('input[type="date"]').last().fill(START_DATE);
   await page.getByPlaceholder("Any questions or specific requirements...").fill(TEST_MESSAGE);
   await page.getByRole("button", { name: "Send enquiry" }).click();
 
-  // Success screen
   await expect(page.getByText("Enquiry sent")).toBeVisible({ timeout: 10000 });
 }
 
 test.describe("Enquiry flow", () => {
   test.beforeEach(async ({ page }) => {
-    // Intercept before navigation so no request slips through
     await mockEnquiryRoute(page);
-
     await page.goto("http://localhost:3000");
-    await expect(page.locator("text=Meadowside Nursery")).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.locator("text=Meadowside Nursery")).toBeVisible({ timeout: 10000 });
   });
 
   test("enquiry from list view", async ({ page }) => {
@@ -84,7 +74,8 @@ test.describe("Enquiry flow", () => {
   });
 
   test("enquiry from map view", async ({ page }) => {
-    await page.getByRole("button", { name: "Map" }).click();
+    // ViewToggle buttons have role="tab" — use getByRole("tab") not "button"
+    await page.getByRole("tab", { name: "Map" }).click();
     await page.waitForTimeout(2000);
 
     const marker = page.locator(".leaflet-marker-icon").first();
@@ -102,12 +93,10 @@ test.describe("Enquiry flow", () => {
     await page.getByRole("button", { name: "Enquire" }).first().click();
     await expect(page.getByText("Enquire at")).toBeVisible();
 
-    // Skip name, fill phone and email, try to continue
     await page.getByPlaceholder("07700 900000").fill(TEST_PHONE);
     await page.getByPlaceholder("you@example.com").fill(TEST_EMAIL);
     await page.getByRole("button", { name: "Continue" }).click();
 
-    // Should show inline error, not advance to step 2
     await expect(page.getByText("Name is required")).toBeVisible();
     await expect(page.getByText("Child date of birth")).not.toBeVisible();
   });
