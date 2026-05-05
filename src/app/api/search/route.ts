@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 import type { AIFilters } from "@/types";
 
 const SYSTEM_PROMPT = `You are a search parser for a nursery finder app in Edinburgh.
-Extract search intent from natural language and return ONLY valid JSON — no markdown, no explanation, no backticks.
+Extract search intent from natural language and return ONLY valid JSON, no markdown, no explanation, no backticks.
 
 Available areas: Morningside, Leith, Bruntsfield, Newington, Stockbridge, Corstorphine
 Available ofsted values: "Outstanding", "Good", "Requires Improvement"
@@ -14,7 +15,7 @@ Age rules:
 - preschool/3-5 years = minAge: 3, maxAge: 5
 - X months old: convert to years (e.g. 6 months = 0.5)
 
-Postcode rules: EH10 4BX → Morningside, EH10 4HR → Bruntsfield, EH6 8DB → Leith, EH9 1QH → Newington, EH3 5NE → Stockbridge, EH12 7AA → Corstorphine
+Postcode rules: EH10 4BX -> Morningside, EH10 4HR -> Bruntsfield, EH6 8DB -> Leith, EH9 1QH -> Newington, EH3 5NE -> Stockbridge, EH12 7AA -> Corstorphine
 
 Return exactly this JSON shape:
 {
@@ -40,8 +41,37 @@ const MODELS = [
   "openrouter/auto",
 ];
 
+const REQUEST_TIMEOUT_MS = 10_000;
+
+// Best-effort logger. Never throws, never blocks the user response if it fails.
+// If the SearchLog table does not exist yet (migration not run) we silently
+// drop the log rather than 500 the user-facing search.
+async function logSearch(entry: {
+  query: string;
+  model: string | null;
+  success: boolean;
+  latencyMs: number;
+  errorDetail: string | null;
+  userAgent: string | null;
+}): Promise<void> {
+  try {
+    await prisma.searchLog.create({ data: entry });
+  } catch (err) {
+    console.warn("SearchLog write failed:", err);
+  }
+}
+
 export async function POST(req: NextRequest) {
-  const { query } = await req.json();
+  const started = Date.now();
+  const userAgent = req.headers.get("user-agent");
+
+  let query: string;
+  try {
+    const body = await req.json();
+    query = body?.query;
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
 
   if (!query || typeof query !== "string") {
     return NextResponse.json({ error: "Missing query" }, { status: 400 });
@@ -62,7 +92,10 @@ export async function POST(req: NextRequest) {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${apiKey}`,
+            Authorization: `Bearer ${apiKey}`,
+            "HTTP-Referer":
+              process.env.NEXT_PUBLIC_SITE_URL ?? "https://nvvri.co.uk",
+            "X-Title": "nvvri",
           },
           body: JSON.stringify({
             model,
@@ -73,7 +106,7 @@ export async function POST(req: NextRequest) {
               { role: "user", content: query },
             ],
           }),
-          signal: AbortSignal.timeout(10000),
+          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
         }
       );
 
@@ -90,14 +123,39 @@ export async function POST(req: NextRequest) {
       if (!match) throw new Error("No JSON found in response");
       const filters: AIFilters = JSON.parse(match[0]);
 
-      return NextResponse.json(filters);
+      if (!filters || typeof filters !== "object" || !("explanation" in filters)) {
+        throw new Error("Response missing required fields");
+      }
 
+      // Log success before returning. Sub-10ms on a warm Neon connection.
+      await logSearch({
+        query,
+        model,
+        success: true,
+        latencyMs: Date.now() - started,
+        errorDetail: null,
+        userAgent,
+      });
+
+      return NextResponse.json(filters, {
+        headers: { "X-AI-Model": model },
+      });
     } catch (err) {
       lastError = err instanceof Error ? err.message : String(err);
       console.warn(`Model ${model} threw:`, lastError);
       continue;
     }
   }
+
+  // All models failed. Client will fall back to the local parser.
+  await logSearch({
+    query,
+    model: null,
+    success: false,
+    latencyMs: Date.now() - started,
+    errorDetail: lastError.slice(0, 500),
+    userAgent,
+  });
 
   return NextResponse.json(
     { error: "All models failed", detail: lastError },
