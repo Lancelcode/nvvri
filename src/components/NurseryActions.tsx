@@ -15,8 +15,8 @@ interface Props {
  */
 export function NurseryActions({ nursery }: Props) {
   const [open, setOpen] = useState(false);
-  const { has, toggle, ready } = useShortlist();
-  const saved = ready && has(nursery.id);
+  const { has, toggle } = useShortlist();
+  const saved = has(nursery.id);
 
   return (
     <>

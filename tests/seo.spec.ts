@@ -24,8 +24,8 @@ test.describe("SEO", () => {
   test("home page has canonical link, OG tags, and JSON-LD", async ({ page }) => {
     await page.goto("http://localhost:3000");
 
-    // Canonical — Next.js renders the full URL without trailing slash e.g.
-    // "https://nvvri.co.uk". Accept any value that contains the domain.
+    // Canonical — Next.js renders the full URL without a trailing slash.
+    // Check that it contains the domain rather than matching an exact pattern.
     const canonical = page.locator('link[rel="canonical"]');
     await expect(canonical).toHaveAttribute("href", /nvvri/);
 
@@ -46,10 +46,7 @@ test.describe("SEO", () => {
 
   test("nursery detail page has Preschool JSON-LD", async ({ page }) => {
     await page.goto("http://localhost:3000/nursery/meadowside-nursery");
-
-    await expect(
-      page.getByRole("heading", { name: "Meadowside Nursery" })
-    ).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole("heading", { name: "Meadowside Nursery" })).toBeVisible({ timeout: 10000 });
 
     const jsonLd = await page
       .locator('script[type="application/ld+json"]')
@@ -66,16 +63,13 @@ test.describe("SEO", () => {
 
   test("unknown nursery slug shows not-found page", async ({ page }) => {
     // In dev mode Next.js may return 200 for notFound() pages.
-    // Just verify the correct content is shown regardless of status code.
+    // Check the content only, not the status code.
     await page.goto("http://localhost:3000/nursery/does-not-exist");
-    await expect(page.getByText("Nursery not found")).toBeVisible({
-      timeout: 10000,
-    });
+    await expect(page.getByText("Nursery not found")).toBeVisible({ timeout: 10000 });
   });
 
   test("admin route is hidden from unauthenticated visitors", async ({ request }) => {
     const res = await request.get("http://localhost:3000/admin/searches");
-    // Middleware returns 404 to hide the route
     expect(res.status()).toBe(404);
   });
 });

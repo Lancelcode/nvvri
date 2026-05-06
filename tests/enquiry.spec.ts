@@ -3,13 +3,8 @@ import { test, expect } from "@playwright/test";
 /**
  * Enquiry flow tests.
  *
- * We intercept POST /api/enquiry and return a mock 200 response so that:
- *   - No Resend emails are sent during CI
- *   - Tests are deterministic (no network variability from an email provider)
- *   - The free Resend allowance is not consumed by automated test runs
- *
- * The intercepted handler validates that the request body is well-formed,
- * so we are still testing that the form sends the right payload.
+ * POST /api/enquiry is intercepted so no Resend emails are sent in CI.
+ * The interceptor still validates the request shape, so we test the real form.
  */
 
 const TEST_EMAIL = "djibysowrebollo@gmail.com";
@@ -20,25 +15,14 @@ const START_DATE = "2025-01-20";
 
 async function mockEnquiryRoute(page: import("@playwright/test").Page) {
   await page.route("**/api/enquiry", async (route) => {
-    const request = route.request();
-    const body = request.postDataJSON() as Record<string, unknown>;
+    const body = route.request().postDataJSON() as Record<string, unknown>;
     const required = ["nurseryName", "nurseryArea", "name", "email", "phone", "childDob", "startDate"];
     const missing = required.filter((k) => !body[k]);
-
     if (missing.length > 0) {
-      await route.fulfill({
-        status: 400,
-        contentType: "application/json",
-        body: JSON.stringify({ error: `Missing: ${missing.join(", ")}` }),
-      });
+      await route.fulfill({ status: 400, contentType: "application/json", body: JSON.stringify({ error: `Missing: ${missing.join(", ")}` }) });
       return;
     }
-
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({ success: true }),
-    });
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ success: true }) });
   });
 }
 
@@ -47,12 +31,10 @@ async function fillEnquiryForm(page: import("@playwright/test").Page) {
   await page.getByPlaceholder("07700 900000").fill(TEST_PHONE);
   await page.getByPlaceholder("you@example.com").fill(TEST_EMAIL);
   await page.getByRole("button", { name: "Continue" }).click();
-
   await page.locator('input[type="date"]').first().fill(CHILD_DOB);
   await page.locator('input[type="date"]').last().fill(START_DATE);
   await page.getByPlaceholder("Any questions or specific requirements...").fill(TEST_MESSAGE);
   await page.getByRole("button", { name: "Send enquiry" }).click();
-
   await expect(page.getByText("Enquiry sent")).toBeVisible({ timeout: 10000 });
 }
 
@@ -66,15 +48,13 @@ test.describe("Enquiry flow", () => {
   test("enquiry from list view", async ({ page }) => {
     await page.getByRole("button", { name: "Enquire" }).first().click();
     await expect(page.getByText("Enquire at")).toBeVisible();
-
     await fillEnquiryForm(page);
-
     await page.getByRole("button", { name: "Done" }).click();
     await expect(page.locator("text=Meadowside Nursery")).toBeVisible();
   });
 
   test("enquiry from map view", async ({ page }) => {
-    // ViewToggle buttons have role="tab" — use getByRole("tab") not "button"
+    // ViewToggle buttons have role="tab" — must use getByRole("tab")
     await page.getByRole("tab", { name: "Map" }).click();
     await page.waitForTimeout(2000);
 
@@ -84,7 +64,6 @@ test.describe("Enquiry flow", () => {
 
     await page.locator(".leaflet-popup button", { hasText: "Enquire" }).click();
     await expect(page.getByText("Enquire at")).toBeVisible();
-
     await fillEnquiryForm(page);
     await page.getByRole("button", { name: "Done" }).click();
   });
@@ -92,23 +71,19 @@ test.describe("Enquiry flow", () => {
   test("validation rejects an empty name", async ({ page }) => {
     await page.getByRole("button", { name: "Enquire" }).first().click();
     await expect(page.getByText("Enquire at")).toBeVisible();
-
     await page.getByPlaceholder("07700 900000").fill(TEST_PHONE);
     await page.getByPlaceholder("you@example.com").fill(TEST_EMAIL);
     await page.getByRole("button", { name: "Continue" }).click();
-
     await expect(page.getByText("Name is required")).toBeVisible();
     await expect(page.getByText("Child date of birth")).not.toBeVisible();
   });
 
   test("validation rejects a malformed email", async ({ page }) => {
     await page.getByRole("button", { name: "Enquire" }).first().click();
-
     await page.getByPlaceholder("Your name").fill("Test User");
     await page.getByPlaceholder("07700 900000").fill(TEST_PHONE);
     await page.getByPlaceholder("you@example.com").fill("not-an-email");
     await page.getByRole("button", { name: "Continue" }).click();
-
     await expect(page.getByText("Enter a valid email")).toBeVisible();
   });
 

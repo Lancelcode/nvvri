@@ -60,8 +60,11 @@ function ofstedBadgeType(rating: OfstedRating): BadgeType {
 }
 
 export function NurseryCard({ nursery, onEnquire }: Props) {
-  const { has, toggle, ready } = useShortlist();
-  const saved = ready && has(nursery.id);
+  const { has, toggle } = useShortlist();
+  // Don't gate on `ready`. ids starts as [] so has() returns false initially
+  // anyway. Gating on ready means a click before the first useEffect fires
+  // leaves aria-pressed stuck on false even after the id is added.
+  const saved = has(nursery.id);
   const slug = slugify(nursery.name);
 
   return (
