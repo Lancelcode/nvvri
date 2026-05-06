@@ -4,9 +4,8 @@ import { test, expect } from "@playwright/test";
  * Shortlist tests.
  *
  * After clicking a heart the aria-label changes from "Add X to shortlist"
- * to "Remove X from shortlist". We confirm the save by looking for the
- * Remove-labelled button rather than checking aria-pressed on a locator
- * that no longer matches after the label changes.
+ * to "Remove X from shortlist". We confirm saves by looking for Remove
+ * buttons rather than checking aria-pressed on the original locator.
  */
 test.describe("Shortlist", () => {
   test.beforeEach(async ({ page }) => {
@@ -18,7 +17,7 @@ test.describe("Shortlist", () => {
     // Save the first nursery
     await page.getByRole("button", { name: /Add .* to shortlist/ }).first().click();
 
-    // The label changes to Remove after saving — confirm that
+    // Label flips to Remove — confirm save worked
     const removeButton = page.getByRole("button", { name: /Remove .* from shortlist/ }).first();
     await expect(removeButton).toBeVisible({ timeout: 5000 });
     await expect(removeButton).toHaveAttribute("aria-pressed", "true");
@@ -32,20 +31,21 @@ test.describe("Shortlist", () => {
   });
 
   test("shortlist page shows saved nurseries and compare view", async ({ page }) => {
-    // Save two nurseries
-    const allAddButtons = page.getByRole("button", { name: /Add .* to shortlist/ });
+    // Save FIRST nursery — pick it by index to be unambiguous
+    const cards = page.locator("article");
+    await cards.nth(0).getByRole("button", { name: /Add .* to shortlist/ }).click();
+    // Wait for it to flip to Remove before saving the second
+    await expect(cards.nth(0).getByRole("button", { name: /Remove .* from shortlist/ })).toBeVisible({ timeout: 5000 });
 
-    await allAddButtons.first().click();
-    await expect(page.getByRole("button", { name: /Remove .* from shortlist/ })).toHaveCount(1, { timeout: 5000 });
+    // Save SECOND nursery
+    await cards.nth(1).getByRole("button", { name: /Add .* to shortlist/ }).click();
+    await expect(cards.nth(1).getByRole("button", { name: /Remove .* from shortlist/ })).toBeVisible({ timeout: 5000 });
 
-    await allAddButtons.first().click();
-    await expect(page.getByRole("button", { name: /Remove .* from shortlist/ })).toHaveCount(2, { timeout: 5000 });
-
-    // Navigate to shortlist
+    // Navigate to shortlist page — localStorage persists across navigation
     await page.goto("http://localhost:3000/shortlist");
     await expect(page.getByRole("heading", { name: "Your shortlist" })).toBeVisible({ timeout: 10000 });
 
-    // Compare tab only shows when 2+ nurseries are saved
+    // Compare tab only appears when 2+ nurseries are saved
     const compareTab = page.getByRole("tab", { name: "Compare" });
     await expect(compareTab).toBeVisible({ timeout: 5000 });
     await compareTab.click();
@@ -55,14 +55,15 @@ test.describe("Shortlist", () => {
   });
 
   test("shortlist persists across page reloads", async ({ page }) => {
-    await page.getByRole("button", { name: /Add .* to shortlist/ }).first().click();
-    await expect(page.getByRole("button", { name: /Remove .* from shortlist/ }).first()).toBeVisible({ timeout: 5000 });
+    const firstCard = page.locator("article").first();
+    await firstCard.getByRole("button", { name: /Add .* to shortlist/ }).click();
+    await expect(firstCard.getByRole("button", { name: /Remove .* from shortlist/ })).toBeVisible({ timeout: 5000 });
 
     await page.reload();
     await expect(page.locator("text=Meadowside Nursery")).toBeVisible({ timeout: 10000 });
 
-    // Should still show as saved after reload
-    await expect(page.getByRole("button", { name: /Remove .* from shortlist/ }).first()).toBeVisible({ timeout: 5000 });
+    // First card should still be saved after reload
+    await expect(page.locator("article").first().getByRole("button", { name: /Remove .* from shortlist/ })).toBeVisible({ timeout: 5000 });
   });
 
   test("empty shortlist shows guidance", async ({ page }) => {
