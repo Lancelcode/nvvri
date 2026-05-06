@@ -41,6 +41,23 @@ test.describe("Shortlist", () => {
     await cards.nth(1).getByRole("button", { name: /Add .* to shortlist/ }).click();
     await expect(cards.nth(1).getByRole("button", { name: /Remove .* from shortlist/ })).toBeVisible({ timeout: 5000 });
 
+    // Wait for localStorage to be written. React's useEffect that persists
+    // ids fires after paint, so the Remove button being visible is not
+    // sufficient — we must wait for the actual write before navigating.
+    await page.waitForFunction(
+      () => {
+        try {
+          const raw = window.localStorage.getItem("nvvri.shortlist");
+          if (!raw) return false;
+          const ids = JSON.parse(raw);
+          return Array.isArray(ids) && ids.length >= 2;
+        } catch {
+          return false;
+        }
+      },
+      { timeout: 5000 }
+    );
+
     // Navigate to shortlist page — localStorage persists across navigation
     await page.goto("http://localhost:3000/shortlist");
     await expect(page.getByRole("heading", { name: "Your shortlist" })).toBeVisible({ timeout: 10000 });
